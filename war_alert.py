@@ -607,22 +607,25 @@ def main():
     state = load_state()
     countries = fetch_countries()
     regions = fetch_regions()
-    watchlist = build_watchlist(regions)
+    ireland = fetch_ireland()
+    watchlist = build_watchlist(regions, ireland)
 
     country_name = {c["_id"]: c.get("name", c["_id"]) for c in countries if c.get("_id")}
-    total_border_regions = sum(len(v) for v in watchlist.values())
-    print(
-        f"Loaded {len(countries)} countries. Watchlist: {len(watchlist)} "
-        f"controlling {total_border_regions} border regions."
-    )
+    print(f"Loaded {len(countries)} countries. Watchlist: {len(watchlist)}.")
     for cid in sorted(watchlist, key=lambda c: country_name.get(c, c)):
-        print(f"  {country_name.get(cid, cid)}: {', '.join(sorted(watchlist[cid]))}")
+        entry = watchlist[cid]
+        parts = []
+        if entry["border_regions"]:
+            parts.append(f"borders: {', '.join(sorted(entry['border_regions']))}")
+        if entry["diplomatic"]:
+            parts.append(", ".join(entry["diplomatic"]))
+        print(f"  {country_name.get(cid, cid)}: {'; '.join(parts)}")
 
     if not watchlist:
         print("Empty watchlist, nothing to sample. Exiting.")
         return
 
-    # Sample only countries that currently control a region neighbouring Ireland
+    # Sample only watchlisted countries
     countries = [c for c in countries if c.get("_id") in watchlist]
 
     snapshots = {}
