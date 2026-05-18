@@ -5,9 +5,9 @@ repurposing themselves) and gradual climbs in the combat/economy skill-
 allocation ratio.
 
 Per run, for every country:
-  - Enumerate up to 100 citizens via user.getUsersByCountry
-  - Fetch user.getUserLite for each (concurrent), keep top 25 by level
-    among those above MIN_LEVEL who connected in the last 14 days
+  - Paginate user.getUsersByCountry, fetching lite profiles per page, until
+    we have 25 qualifying citizens (level >= 20, active in last 14 days) or
+    the country's citizen list is exhausted (max 5 pages)
   - Aggregate: count of resets in the last 5 days, mean combat-skill ratio
 
 Diff against state.json's per-country history (14-day rolling window):
@@ -38,7 +38,8 @@ STATE_FILE = Path("war_state.json")
 TOOLS_URL = "https://tools.we-ie.com/"
 
 # Sampling per country
-ENUM_LIMIT = 100               # citizens to enumerate via user.getUsersByCountry
+ENUM_LIMIT = 100               # citizens per page via user.getUsersByCountry
+MAX_PAGES = 5                  # paginate up to this many pages of older citizens
 SAMPLE_TOP_N = 25              # of those that pass filters, keep top-N by level
 MIN_LEVEL = 20                 # ignore citizens below this level
 MIN_SAMPLE = 10                # skip countries with fewer eligible citizens
@@ -103,9 +104,14 @@ def fetch_countries():
     return data or []
 
 
-def fetch_citizen_ids(country_id):
-    data = trpc("user.getUsersByCountry", {"countryId": country_id, "limit": ENUM_LIMIT})
-    return [u["_id"] for u in (data or {}).get("items", []) if u.get("_id")]
+def fetch_citizens_page(country_id, cursor=None):
+    """One page of citizen IDs + the next cursor (or None if exhausted)."""
+    payload = {"countryId": country_id, "limit": ENUM_LIMIT}
+    if cursor:
+        payload["cursor"] = cursor
+    data = trpc("user.getUsersByCountry", payload) or {}
+    ids = [u["_id"] for u in data.get("items", []) if u.get("_id")]
+    return ids, data.get("nextCursor")
 
 
 def fetch_user_lite(user_id):
@@ -164,23 +170,47 @@ def combat_ratio(user):
 # ---------- Country sampling ----------
 
 def sample_country(country_id, country_name, now):
-    """Aggregate snapshot for a country, or None if eligible sample < MIN_SAMPLE."""
-    citizen_ids = fetch_citizen_ids(country_id)
-    if not citizen_ids:
-        return None
+    """Aggregate snapshot for a country, or None if eligible sample < MIN_SAMPLE.
 
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-        users = [
-            r for r in (
-                f.result() for f in as_completed(
-                    {ex.submit(fetch_user_lite, uid) for uid in citizen_ids}
-                )
-            ) if r is not None
-        ]
+    Paginates older citizens lazily: fetches a page, pulls lite profiles for
+    those IDs, accumulates qualifying citizens, then either stops (enough
+    qualifying / no more pages / page cap hit) or fetches another page. Big
+    countries terminate on page 1; small ones may walk several pages back
+    through their citizen list before finding their established players.
+    """
+    qualifying = []
+    seen_ids = set()
+    cursor = None
 
-    eligible = [u for u in users if user_level(u) >= MIN_LEVEL and is_active(u, now)]
-    eligible.sort(key=user_level, reverse=True)
-    sample = eligible[:SAMPLE_TOP_N]
+    for _ in range(MAX_PAGES):
+        try:
+            page_ids, cursor = fetch_citizens_page(country_id, cursor)
+        except Exception:
+            break
+        new_ids = [uid for uid in page_ids if uid not in seen_ids]
+        if not new_ids:
+            break
+        seen_ids.update(new_ids)
+
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+            users = [
+                r for r in (
+                    f.result() for f in as_completed(
+                        {ex.submit(fetch_user_lite, uid) for uid in new_ids}
+                    )
+                ) if r is not None
+            ]
+
+        qualifying.extend(
+            u for u in users
+            if user_level(u) >= MIN_LEVEL and is_active(u, now)
+        )
+
+        if len(qualifying) >= SAMPLE_TOP_N or not cursor:
+            break
+
+    qualifying.sort(key=user_level, reverse=True)
+    sample = qualifying[:SAMPLE_TOP_N]
     if len(sample) < MIN_SAMPLE:
         return None
 
