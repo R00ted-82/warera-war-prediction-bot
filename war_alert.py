@@ -5,14 +5,13 @@ repurposing themselves) and gradual climbs in the combat/economy skill-
 allocation ratio.
 
 Sampling is restricted to a watchlist built from two sources:
-  1. Countries currently controlling a region bordering Ireland (see
-     BORDER_REGION_NAMES — static list of region names, dynamic country
-     resolution at runtime)
-  2. Countries listed as Ireland's sworn enemy or active-war opponent
-     in the diplomatic data on the Ireland country object
-A country joins the watchlist if either criterion is met. Both fields
-update dynamically each run — no code change needed when controllers
-shift or wars are declared/ended.
+  1. Countries controlling at least one region within BORDER_HOPS hops
+     of Ireland's territory, derived dynamically by walking each
+     region's `neighbors` field in region.getRegionsObject
+  2. Countries listed in Ireland's `warsWith` diplomatic field
+A country joins the watchlist if either criterion is met. Both update
+dynamically each run — no code change needed when territory shifts or
+wars are declared/ended.
 
 Per run, for every watchlisted country:
   - Fetch lite profiles for the country's known veterans (cached from prior
@@ -54,35 +53,11 @@ STATE_FILE = Path("war_state.json")
 STATE_VERSION = 3
 IRELAND_COUNTRY_ID = "6813b6d446e731854c7ac7fe"
 
-# Regions that physically border Ireland (land or short sea routes). We sample
-# only countries that currently control one of these regions, since they're
-# the only ones in practical attack range. Update this list if Ireland
-# expands its territory — the API doesn't expose region adjacency, so this
-# can't be derived automatically. Region names must match exactly as
-# returned by region.getRegionsObject.
-BORDER_REGION_NAMES = {
-    # British Isles
-    "Northern Ireland",
-    "Scotland",
-    "Wales",
-    "Central England",
-    "Southeastern England",
-    # Channel and North Sea
-    "Brittany",
-    "Northern France",
-    # Iceland and North Atlantic islands
-    "Western Iceland",
-    "Northeastern Iceland",
-    "Eastern Iceland",
-    "Southern Iceland",
-    "Faroe Islands",
-    # Mid-Atlantic
-    "Azores",
-    # Transatlantic sea routes
-    "American Atlantic Coast",
-    "Atlantic Canada",
-    "Southern Greenland",
-}
+# Watchlist scope
+BORDER_HOPS = 3                # how far out to walk Ireland's adjacency graph.
+                               # 1 = direct borders only; 3 catches countries
+                               # that could project force via 1-2 intermediate
+                               # conquests.
 
 # Sampling per country
 ENUM_LIMIT = 100               # citizens per page via user.getUsersByCountry
@@ -180,29 +155,66 @@ def fetch_ireland():
         return None
 
 
+def find_border_countries(regions_obj, country_id, max_hops=None):
+    """Returns {country_id: [region_names]} for foreign countries
+    controlling at least one region within max_hops of the given
+    country's territory.
+
+    BFS across the game's adjacency graph (region.neighbors), starting
+    from every region the country controls. At max_hops=1 this is
+    direct borders; higher values catch countries that could plausibly
+    project force via intermediate conquests. Own-country regions are
+    excluded from the result but are still traversable as starting
+    points (each owned region seeds the frontier).
+    """
+    if max_hops is None:
+        max_hops = BORDER_HOPS
+
+    own_ids = {
+        r["_id"] for r in regions_obj.values()
+        if isinstance(r, dict)
+        and r.get("country") == country_id
+        and r.get("_id")
+    }
+    visited = set(own_ids)
+    frontier = set(own_ids)
+    borders = {}
+
+    for _ in range(max_hops):
+        next_frontier = set()
+        for rid in frontier:
+            region = regions_obj.get(rid)
+            if not isinstance(region, dict):
+                continue
+            for nid in region.get("neighbors") or []:
+                if nid in visited:
+                    continue
+                visited.add(nid)
+                next_frontier.add(nid)
+                neighbor = regions_obj.get(nid)
+                if not isinstance(neighbor, dict):
+                    continue
+                ncountry = neighbor.get("country")
+                if not ncountry or ncountry == country_id:
+                    continue
+                borders.setdefault(ncountry, []).append(
+                    neighbor.get("name") or nid
+                )
+        if not next_frontier:
+            break
+        frontier = next_frontier
+
+    return borders
+
+
 def _extract_diplomatic_enemies(ireland):
-    """Returns dict country_id -> list of reasons ('sworn enemy', 'at war')."""
+    """Returns dict country_id -> list of reasons ('at war')."""
     enemies = {}
     if not ireland:
         return enemies
-    sworn = ireland.get("swornEnemy") or ireland.get("enemy")
-    if sworn and isinstance(sworn, str):
-        enemies.setdefault(sworn, []).append("sworn enemy")
-    # War list field name varies in similar APIs; entries may be raw IDs or
-    # wrapped war objects with an opponent reference inside.
-    wars = (ireland.get("activeWars") or ireland.get("wars")
-            or ireland.get("warOpponents") or [])
-    for w in wars:
-        opponent = None
-        if isinstance(w, str):
-            opponent = w
-        elif isinstance(w, dict):
-            for key in ("opponent", "enemy", "country", "opponentCountry"):
-                if w.get(key) and isinstance(w[key], str):
-                    opponent = w[key]
-                    break
-        if opponent:
-            enemies.setdefault(opponent, []).append("at war")
+    for cid in ireland.get("warsWith") or []:
+        if isinstance(cid, str):
+            enemies.setdefault(cid, []).append("at war")
     return enemies
 
 
@@ -210,28 +222,22 @@ def build_watchlist(regions_obj, ireland):
     """Map of country_id -> {border_regions, diplomatic} describing why
     each country is being monitored.
 
-    A country can earn a watchlist spot by controlling a border region,
-    by being listed as Ireland's sworn enemy or active-war opponent, or
-    both. Logs a warning for any BORDER_REGION_NAMES entry that doesn't
-    appear in the API response (typo or rename).
+    Nearby countries are derived dynamically by walking the region
+    adjacency graph out to BORDER_HOPS. Diplomatic opponents come from
+    Ireland's warsWith list. A country can earn its spot via either
+    signal, or both. The `border_regions` field holds the foreign
+    region names within range that put it on the list (used only for
+    logging).
     """
     entries = {}
-    found_names = set()
-    for region in regions_obj.values():
-        if not isinstance(region, dict):
-            continue
-        name = region.get("name")
-        country_id = region.get("country")
-        if name in BORDER_REGION_NAMES:
-            found_names.add(name)
-            if country_id:
-                entries.setdefault(
-                    country_id, {"border_regions": [], "diplomatic": []}
-                )["border_regions"].append(name)
-    missing = BORDER_REGION_NAMES - found_names
-    if missing:
-        print(f"  warn: border regions not found in API: {sorted(missing)}",
-              file=sys.stderr)
+
+    for ncid, region_names in find_border_countries(
+        regions_obj, IRELAND_COUNTRY_ID
+    ).items():
+        entries[ncid] = {
+            "border_regions": sorted(set(region_names)),
+            "diplomatic": [],
+        }
 
     for cid, reasons in _extract_diplomatic_enemies(ireland).items():
         entries.setdefault(
@@ -611,12 +617,18 @@ def main():
     watchlist = build_watchlist(regions, ireland)
 
     country_name = {c["_id"]: c.get("name", c["_id"]) for c in countries if c.get("_id")}
-    print(f"Loaded {len(countries)} countries. Watchlist: {len(watchlist)}.")
+    print(f"Loaded {len(countries)} countries. Watchlist: {len(watchlist)} "
+          f"(within {BORDER_HOPS} hops of Ireland).")
     for cid in sorted(watchlist, key=lambda c: country_name.get(c, c)):
         entry = watchlist[cid]
         parts = []
         if entry["border_regions"]:
-            parts.append(f"borders: {', '.join(sorted(entry['border_regions']))}")
+            regs = sorted(entry["border_regions"])
+            if len(regs) > 4:
+                shown = f"{', '.join(regs[:3])} (+{len(regs) - 3} more)"
+            else:
+                shown = ", ".join(regs)
+            parts.append(f"in range: {shown}")
         if entry["diplomatic"]:
             parts.append(", ".join(entry["diplomatic"]))
         print(f"  {country_name.get(cid, cid)}: {'; '.join(parts)}")
