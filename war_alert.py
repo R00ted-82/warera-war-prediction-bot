@@ -5,20 +5,25 @@ repurposing themselves) and gradual climbs in the combat/economy skill-
 allocation ratio.
 
 Per run, for every country:
-  - Paginate user.getUsersByCountry, fetching lite profiles per page, until
-    we have 25 qualifying citizens (level >= 20, active in last 14 days) or
-    the country's citizen list is exhausted (max 5 pages)
-  - Aggregate: count of resets in the last 5 days, mean combat-skill ratio
+  - Fetch lite profiles for the country's known veterans (cached from prior
+    runs) OR paginate user.getUsersByCountry to discover them, refreshing
+    the cohort every DISCOVERY_INTERVAL_DAYS
+  - Keep top 25 qualifying (level >= 20, active in last 14 days) by level
+  - Aggregate: count of resets in last 5 days, median combat-skill ratio
 
 Diff against state.json's per-country history (14-day rolling window):
-  - Reset burst — current 5-day reset count exceeds 2σ above the country's
-    own rolling baseline (or RESET_FLOOR, whichever is greater)
-  - Ratio creep — current combat ratio is ≥20 percentage points above
-    where it was ~7 days ago
+  - Reset burst: 5-day reset count >= 2σ above the country's rolling
+    baseline (or RESET_FLOOR floor, whichever is greater)
+  - Ratio creep: combat ratio >= 20 percentage points above where it was
+    ~7 days ago
 
-First ~5 runs collect baseline silently. Posts Discord embeds when
-triggered. Sibling of alert.py — same Discord embed style, same repo
-conventions, separate state file.
+Output:
+  - One digest embed per run listing every flagged country with severity
+    icons (red/orange/yellow)
+  - Dedicated alerts for high-severity bursts only (>= 1.5× threshold or
+    10+ absolute resets), with sparkline trends for resets and ratio
+
+First ~5 runs collect baseline silently. Sibling of alert.py.
 """
 
 import json
@@ -35,7 +40,7 @@ import requests
 WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 API_BASE = "https://warera-proxy.toie.workers.dev/trpc"
 STATE_FILE = Path("war_state.json")
-TOOLS_URL = "https://tools.we-ie.com/"
+STATE_VERSION = 3
 
 # Sampling per country
 ENUM_LIMIT = 100               # citizens per page via user.getUsersByCountry
@@ -44,6 +49,7 @@ SAMPLE_TOP_N = 25              # of those that pass filters, keep top-N by level
 MIN_LEVEL = 20                 # ignore citizens below this level
 MIN_SAMPLE = 10                # skip countries with fewer eligible citizens
 ACTIVITY_WINDOW_DAYS = 14      # citizen counts as "active" if connected within
+DISCOVERY_INTERVAL_DAYS = 7    # full re-pagination cadence per country
 
 # Concurrency
 MAX_WORKERS = 10
@@ -55,15 +61,23 @@ RESET_WINDOW_DAYS = 5
 HISTORY_LEN = 14               # rolling history kept per country
 MIN_HISTORY_FOR_BASELINE = 5
 BASELINE_SIGMA = 2.0
-RESET_FLOOR = 5                # absolute minimum reset count to even consider alerting
+RESET_FLOOR = 5                # absolute minimum reset count to consider alerting
 RATIO_CREEP_PP = 20.0          # combat-ratio gain (percentage points) that triggers
 RATIO_LOOKBACK_DAYS = 7
 
-# Embed colors
-COLOR_RESET_BURST = 0xED4245   # red — concrete preparation signal
-COLOR_RATIO_CREEP = 0xFEE75C   # yellow — softer, longer-running shift
+# Severity (bursts above these get their own alert; everything else goes in the digest)
+HIGH_SEVERITY_FACTOR = 1.5     # burst >= this × threshold counts as urgent
+HIGH_SEVERITY_FLOOR = 10       # OR >= this many absolute resets
 
-# Skill buckets — each skill's `level` field is the number of points spent on it.
+# Embed colours
+COLOUR_RESET_BURST = 0xED4245  # red: concrete preparation signal
+COLOUR_RATIO_CREEP = 0xFEE75C  # yellow: softer, longer-running shift
+COLOUR_DIGEST = 0x5865F2       # blurple: neutral roundup colour
+
+# Sparkline characters (low to high)
+SPARKLINE_BARS = "▁▂▃▄▅▆▇█"
+
+# Skill buckets: each skill's `level` field is the number of points spent on it.
 # Energy and hunger are excluded as ambiguous (both feed work cycles AND combat).
 COMBAT_SKILLS = {
     "attack", "precision", "dodge", "armor", "lootChance",
@@ -105,7 +119,7 @@ def fetch_countries():
 
 
 def fetch_citizens_page(country_id, cursor=None):
-    """One page of citizen IDs + the next cursor (or None if exhausted)."""
+    """One page of citizen IDs plus the next cursor (or None if exhausted)."""
     payload = {"countryId": country_id, "limit": ENUM_LIMIT}
     if cursor:
         payload["cursor"] = cursor
@@ -120,6 +134,20 @@ def fetch_user_lite(user_id):
     except Exception as e:
         print(f"  warn: user {user_id}: {e}", file=sys.stderr)
         return None
+
+
+def parallel_fetch_lite(user_ids):
+    """Fetch lite profiles for a batch of IDs concurrently."""
+    if not user_ids:
+        return []
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+        return [
+            r for r in (
+                f.result() for f in as_completed(
+                    {ex.submit(fetch_user_lite, uid) for uid in user_ids}
+                )
+            ) if r is not None
+        ]
 
 
 # ---------- Parsing helpers ----------
@@ -167,17 +195,24 @@ def combat_ratio(user):
     return (combat / total) * 100.0
 
 
+def sparkline(values):
+    """Unicode block-character sparkline. Empty string if no values."""
+    if not values:
+        return ""
+    lo, hi = min(values), max(values)
+    if lo == hi:
+        return SPARKLINE_BARS[0] * len(values)
+    rng = hi - lo
+    n = len(SPARKLINE_BARS) - 1
+    return "".join(
+        SPARKLINE_BARS[min(int((v - lo) / rng * n), n)] for v in values
+    )
+
+
 # ---------- Country sampling ----------
 
-def sample_country(country_id, country_name, now):
-    """Aggregate snapshot for a country, or None if eligible sample < MIN_SAMPLE.
-
-    Paginates older citizens lazily: fetches a page, pulls lite profiles for
-    those IDs, accumulates qualifying citizens, then either stops (enough
-    qualifying / no more pages / page cap hit) or fetches another page. Big
-    countries terminate on page 1; small ones may walk several pages back
-    through their citizen list before finding their established players.
-    """
+def discover_qualifying(country_id, now):
+    """Paginate user.getUsersByCountry until enough qualifying citizens found."""
     qualifying = []
     seen_ids = set()
     cursor = None
@@ -192,15 +227,7 @@ def sample_country(country_id, country_name, now):
             break
         seen_ids.update(new_ids)
 
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-            users = [
-                r for r in (
-                    f.result() for f in as_completed(
-                        {ex.submit(fetch_user_lite, uid) for uid in new_ids}
-                    )
-                ) if r is not None
-            ]
-
+        users = parallel_fetch_lite(new_ids)
         qualifying.extend(
             u for u in users
             if user_level(u) >= MIN_LEVEL and is_active(u, now)
@@ -208,6 +235,41 @@ def sample_country(country_id, country_name, now):
 
         if len(qualifying) >= SAMPLE_TOP_N or not cursor:
             break
+
+    return qualifying
+
+
+def sample_country(country_id, country_name, now, country_state):
+    """Aggregate snapshot for a country, or None if eligible sample < MIN_SAMPLE.
+
+    Uses cached citizen IDs from prior runs when available. Re-discovers via
+    pagination every DISCOVERY_INTERVAL_DAYS, when the cache is empty, or
+    when too few cached citizens still qualify.
+    """
+    known_ids = country_state.get("known_veterans", [])
+    last_discovery_iso = country_state.get("last_discovery")
+    last_discovery = parse_iso(last_discovery_iso)
+    cache_stale = (
+        last_discovery is None
+        or (now - last_discovery).days >= DISCOVERY_INTERVAL_DAYS
+    )
+
+    qualifying = []
+    used_discovery = False
+
+    if known_ids and not cache_stale:
+        users = parallel_fetch_lite(known_ids)
+        qualifying = [
+            u for u in users
+            if user_level(u) >= MIN_LEVEL and is_active(u, now)
+        ]
+        # Too many dropouts since last discovery: force a refresh
+        if len(qualifying) < MIN_SAMPLE:
+            qualifying = []
+
+    if not qualifying:
+        qualifying = discover_qualifying(country_id, now)
+        used_discovery = True
 
     qualifying.sort(key=user_level, reverse=True)
     sample = qualifying[:SAMPLE_TOP_N]
@@ -223,7 +285,10 @@ def sample_country(country_id, country_name, now):
         "name": country_name,
         "sample_size": len(sample),
         "resets_5d": resets,
-        "combat_ratio": round(statistics.mean(ratios), 2),
+        "combat_ratio": round(statistics.median(ratios), 2),
+        "known_veterans": [u.get("_id") for u in sample if u.get("_id")],
+        "last_discovery": now.isoformat() if used_discovery else last_discovery_iso,
+        "used_discovery": used_discovery,
     }
 
 
@@ -233,7 +298,7 @@ def detect_reset_burst(history, current):
     """Returns dict describing the burst, or None."""
     prior = [h["resets_5d"] for h in history]
     if len(prior) < MIN_HISTORY_FOR_BASELINE:
-        # No reliable baseline yet — only fire on absolute floor
+        # No reliable baseline yet, only fire on absolute floor
         if current >= RESET_FLOOR:
             return {"baseline_mean": None, "threshold": RESET_FLOOR, "current": current}
         return None
@@ -257,7 +322,6 @@ def detect_ratio_creep(history, current_ratio, now):
     closest = min(history, key=lambda h: abs(parse_iso(h["ts"]) - target))
     age = (now - parse_iso(closest["ts"])).days
     if age < RATIO_LOOKBACK_DAYS - 1:
-        # Not enough history yet to look back
         return None
     delta = current_ratio - closest["combat_ratio"]
     if delta >= RATIO_CREEP_PP:
@@ -265,11 +329,17 @@ def detect_ratio_creep(history, current_ratio, now):
     return None
 
 
+def is_high_severity(burst):
+    """True if a reset burst warrants its own dedicated Discord message."""
+    threshold = burst.get("threshold") or RESET_FLOOR
+    return burst["current"] >= max(threshold * HIGH_SEVERITY_FACTOR, HIGH_SEVERITY_FLOOR)
+
+
 # ---------- State ----------
 
 def load_state():
     if not STATE_FILE.exists():
-        return {"version": 2, "countries": {}}
+        return {"version": STATE_VERSION, "countries": {}}
     return json.loads(STATE_FILE.read_text())
 
 
@@ -284,18 +354,34 @@ def post_embed(payload):
     r.raise_for_status()
 
 
-def send_reset_burst(country_name, snap, burst):
+def trend_field(history, snap):
+    """Sparkline lines showing 14-run trends for resets and combat ratio."""
+    if len(history) < 2:
+        return "Not enough history yet."
+    reset_series = [h["resets_5d"] for h in history] + [snap["resets_5d"]]
+    ratio_series = [h["combat_ratio"] for h in history] + [snap["combat_ratio"]]
+    return (
+        f"`{sparkline(reset_series)}` resets "
+        f"({reset_series[0]} → {reset_series[-1]})\n"
+        f"`{sparkline(ratio_series)}` combat ratio "
+        f"({ratio_series[0]:.0f}% → {ratio_series[-1]:.0f}%)"
+    )
+
+
+def send_high_severity_burst(country_name, snap, burst, history):
+    """Dedicated alert for high-severity reset bursts."""
     if burst.get("baseline_mean") is not None:
         baseline_text = f"normally ~**{burst['baseline_mean']}** in a 5-day window"
     else:
-        baseline_text = "no baseline yet — alerting on absolute floor"
+        baseline_text = "no baseline yet, alerting on absolute floor"
+
     embed = {
-        "title": f"⚠️ War Preparation Detected — {country_name}",
-        "color": COLOR_RESET_BURST,
+        "title": f"⚠️ War Preparation Detected: {country_name}",
+        "color": COLOUR_RESET_BURST,
         "description": (
             f"**{burst['current']}** sampled citizens reset their skills in "
             f"the last {RESET_WINDOW_DAYS} days ({baseline_text}). Skill resets "
-            f"cost gold, so a burst is rarely casual — it usually means people "
+            f"cost gold, so a burst is rarely casual. It usually means people "
             f"are repurposing themselves for combat."
         ),
         "fields": [
@@ -316,8 +402,8 @@ def send_reset_burst(country_name, snap, burst):
                 "inline": False,
             },
             {
-                "name": "Tools",
-                "value": f"[War Era · Ireland tools →]({TOOLS_URL})",
+                "name": "Trend (last 14 runs)",
+                "value": trend_field(history, snap),
                 "inline": False,
             },
         ],
@@ -326,34 +412,64 @@ def send_reset_burst(country_name, snap, burst):
     post_embed({"embeds": [embed]})
 
 
-def send_ratio_creep(country_name, snap, creep):
+def send_digest(flagged, now):
+    """One summary embed of every flagged country, severity-ranked."""
+    if not flagged:
+        return
+
+    severity_order = {"high": 0, "med": 1, "low": 2}
+    flagged.sort(key=lambda f: (severity_order.get(f["severity"], 9), f["name"]))
+
+    fields = []
+    for f in flagged[:25]:
+        snap = f["snap"]
+        if f["kind"] == "burst":
+            icon = "🔴" if f["severity"] == "high" else "🟠"
+            burst = f["detection"]
+            baseline = (
+                f"baseline ~{burst['baseline_mean']:.1f}"
+                if burst.get("baseline_mean") is not None
+                else "no baseline"
+            )
+            value = (
+                f"**{burst['current']}** resets in {RESET_WINDOW_DAYS}d "
+                f"({baseline}) • {snap['combat_ratio']:.0f}% combat"
+            )
+        else:
+            icon = "🟡"
+            creep = f["detection"]
+            value = (
+                f"{creep['old_ratio']:.0f}% → **{snap['combat_ratio']:.0f}%** "
+                f"(+{creep['delta_pp']:.1f} pp, ~{RATIO_LOOKBACK_DAYS}d)"
+            )
+        fields.append({
+            "name": f"{icon} {f['name']}",
+            "value": value,
+            "inline": False,
+        })
+
+    counts = {"high": 0, "med": 0, "low": 0}
+    for f in flagged:
+        counts[f["severity"]] = counts.get(f["severity"], 0) + 1
+    parts = []
+    if counts["high"]:
+        parts.append(f"**{counts['high']}** urgent")
+    if counts["med"]:
+        parts.append(f"**{counts['med']}** preparing")
+    if counts["low"]:
+        parts.append(f"**{counts['low']}** drifting")
+    summary = ", ".join(parts) if parts else "all quiet"
+
+    description = f"{summary} ({len(flagged)} total)."
+    if len(flagged) > 25:
+        description += f"\nShowing top 25; {len(flagged) - 25} more not displayed."
+
     embed = {
-        "title": f"📊 Combat Ratio Climbing — {country_name}",
-        "color": COLOR_RATIO_CREEP,
-        "description": (
-            f"Citizens are shifting their skill allocation toward combat. "
-            f"Slower-burn than a reset burst — could be early-stage prep, "
-            f"could be normal drift. Worth watching."
-        ),
-        "fields": [
-            {
-                "name": "Combat ratio",
-                "value": (
-                    f"**{creep['old_ratio']:.1f}%** → **{snap['combat_ratio']:.1f}%** "
-                    f"(+{creep['delta_pp']:.1f} pp over ~{RATIO_LOOKBACK_DAYS} days)"
-                ),
-                "inline": False,
-            },
-            {
-                "name": "Sample",
-                "value": (
-                    f"Top **{snap['sample_size']}** active citizens "
-                    f"(level ≥ {MIN_LEVEL}, online in last {ACTIVITY_WINDOW_DAYS} days)"
-                ),
-                "inline": False,
-            },
-        ],
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "title": "🛡️ War Watch · Daily Digest",
+        "color": COLOUR_DIGEST,
+        "description": description,
+        "fields": fields,
+        "timestamp": now.isoformat(),
     }
     post_embed({"embeds": [embed]})
 
@@ -372,9 +488,10 @@ def main():
         cname = country.get("name") or cid
         if not cid:
             continue
+        country_state = state.get("countries", {}).get(cid, {})
         print(f"[{i}/{len(countries)}] {cname}...", end=" ", flush=True)
         try:
-            snap = sample_country(cid, cname, now)
+            snap = sample_country(cid, cname, now, country_state)
         except Exception as e:
             print(f"failed: {e}")
             continue
@@ -382,30 +499,46 @@ def main():
             print("skipped (insufficient sample)")
             continue
         snapshots[cid] = snap
-        print(f"sample={snap['sample_size']} resets5d={snap['resets_5d']} "
+        mode = "disc" if snap.get("used_discovery") else "cache"
+        print(f"sample={snap['sample_size']}({mode}) "
+              f"resets5d={snap['resets_5d']} "
               f"combat={snap['combat_ratio']:.1f}%")
 
-    alerts = 0
+    flagged = []
+    high_sev_sent = 0
     new_countries_state = {}
+
     for cid, snap in snapshots.items():
         prev = state.get("countries", {}).get(cid, {})
         history = prev.get("history", [])
 
         burst = detect_reset_burst(history, snap["resets_5d"])
-        if burst:
-            try:
-                send_reset_burst(snap["name"], snap, burst)
-                alerts += 1
-            except Exception as e:
-                print(f"  failed reset alert for {snap['name']}: {e}", file=sys.stderr)
-
         creep = detect_ratio_creep(history, snap["combat_ratio"], now)
+
+        if burst:
+            high = is_high_severity(burst)
+            flagged.append({
+                "name": snap["name"],
+                "kind": "burst",
+                "severity": "high" if high else "med",
+                "snap": snap,
+                "detection": burst,
+            })
+            if high:
+                try:
+                    send_high_severity_burst(snap["name"], snap, burst, history)
+                    high_sev_sent += 1
+                except Exception as e:
+                    print(f"  failed burst alert for {snap['name']}: {e}", file=sys.stderr)
+
         if creep:
-            try:
-                send_ratio_creep(snap["name"], snap, creep)
-                alerts += 1
-            except Exception as e:
-                print(f"  failed creep alert for {snap['name']}: {e}", file=sys.stderr)
+            flagged.append({
+                "name": snap["name"],
+                "kind": "creep",
+                "severity": "low",
+                "snap": snap,
+                "detection": creep,
+            })
 
         new_history = (history + [{
             "ts": now.isoformat(),
@@ -418,14 +551,27 @@ def main():
             "sample_size": snap["sample_size"],
             "resets_5d": snap["resets_5d"],
             "combat_ratio": snap["combat_ratio"],
+            "known_veterans": snap.get("known_veterans", []),
+            "last_discovery": snap.get("last_discovery"),
             "history": new_history,
         }
 
-    state["version"] = 2
+    if flagged:
+        try:
+            send_digest(flagged, now)
+        except Exception as e:
+            print(f"  failed digest: {e}", file=sys.stderr)
+
+    state["version"] = STATE_VERSION
     state["last_run"] = now.isoformat()
     state["countries"] = new_countries_state
     save_state(state)
-    print(f"Done. Snapshots: {len(snapshots)}. Alerts sent: {alerts}.")
+    print(
+        f"Done. Snapshots: {len(snapshots)}. "
+        f"Flagged: {len(flagged)} ({high_sev_sent} urgent, "
+        f"{sum(1 for f in flagged if f['severity'] == 'med')} preparing, "
+        f"{sum(1 for f in flagged if f['severity'] == 'low')} drifting)."
+    )
 
 
 if __name__ == "__main__":
