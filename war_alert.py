@@ -28,6 +28,7 @@ First ~5 runs collect baseline silently. Sibling of alert.py.
 
 import json
 import os
+import random
 import statistics
 import sys
 import time
@@ -52,7 +53,7 @@ ACTIVITY_WINDOW_DAYS = 14      # citizen counts as "active" if connected within
 DISCOVERY_INTERVAL_DAYS = 7    # full re-pagination cadence per country
 
 # Concurrency
-MAX_WORKERS = 10
+MAX_WORKERS = 5
 HTTP_TIMEOUT = 30
 RETRY_ATTEMPTS = 3
 
@@ -99,14 +100,18 @@ def trpc(endpoint, payload=None, attempt=1):
         data = r.json()
         if isinstance(data, dict) and data.get("error"):
             msg = str(data["error"].get("message") or "unknown")
-            transient = ("503", "504", "no available server", "timed out", "fetch failed")
+            transient = (
+                "503", "504", "no available server", "timed out", "fetch failed",
+                "post ", "api2.warera.io",  # upstream batch errors
+            )
             if any(s in msg.lower() for s in transient):
                 raise requests.exceptions.RequestException(f"transient: {msg}")
             raise RuntimeError(f"{endpoint} → {msg[:120]}")
         return data.get("result", {}).get("data")
     except (requests.exceptions.RequestException, json.JSONDecodeError):
         if attempt < RETRY_ATTEMPTS:
-            time.sleep(0.4 * attempt)
+            # Jitter prevents N parallel retries from bundling at the proxy again
+            time.sleep(0.4 * attempt + random.uniform(0, 0.5))
             return trpc(endpoint, payload, attempt + 1)
         raise
 
@@ -129,6 +134,9 @@ def fetch_citizens_page(country_id, cursor=None):
 
 
 def fetch_user_lite(user_id):
+    # Small jitter decorrelates parallel requests so the proxy doesn't bundle
+    # them into a single upstream call (which the game API rejects when large).
+    time.sleep(random.uniform(0, 0.15))
     try:
         return trpc("user.getUserLite", {"userId": user_id})
     except Exception as e:
