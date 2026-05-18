@@ -1,0 +1,490 @@
+{
+  "countries": {
+    "6813b6d446e731854c7ac79a": {
+      "combat_ratio": 81.4,
+      "history": [
+        {
+          "combat_ratio": 81.4,
+          "resets_5d": 4,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "68c71c6108f0a4e094b64cd1",
+        "68a217c477dbbe3211da0c87",
+        "69033e9c6993cc1212858b2f",
+        "6916e072991d93d5d34deedb",
+        "69036187009657975ceb4e37",
+        "690510343968fc6faf89a856",
+        "68fb697597f7a72934bf3bc5",
+        "68fb92ae8831416ea7684f80",
+        "6919c7be99b6f95d037a8087",
+        "6906aa93d65e59eb3ba1a26e",
+        "69065e23e8e12c3b9ff9f06b",
+        "690631da4284de8e5e898eff",
+        "6902032f582da7f4b18f5902",
+        "69025adcfe0f15858fead462",
+        "68ff70b2ddd6dbcaaf468fc7",
+        "69473a49955d216659cb3dc6",
+        "69418fc777214006429fdbbb",
+        "691756e6b6d7886e8cd3bbf3",
+        "6914b82c9aee34224001f473",
+        "6914918a0b5348273322d176",
+        "69064cbcf4d83281b2b9974a",
+        "69035220d2b4a4bcee5f396a",
+        "6945bd36a3e161cb35b91c52",
+        "6945a97f91014485e27161bf",
+        "6945bab3ecf9f19d2f3c17f8"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "France",
+      "resets_5d": 4,
+      "sample_size": 25
+    },
+    "6813b6d446e731854c7ac79c": {
+      "combat_ratio": 10.53,
+      "history": [
+        {
+          "combat_ratio": 10.53,
+          "resets_5d": 10,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "69d143acb9056ee8e15a184a",
+        "69d003e252e32e997e209c3a",
+        "69cfeb2d5e2e9eebd04b7be0",
+        "69cfe4ee88769f2d03b75791",
+        "69ceefd71a5e7b2eb9181868",
+        "69ceebe870c6e3021dd7e934",
+        "69cebf8eeeda45a4b229def4",
+        "69cecb5069020a37689d6d46",
+        "69cebfb898f354297b64528a",
+        "69cecc587a0f47793a494591",
+        "69ce64a7c15043c1af20028c",
+        "69ce2b50b3a3e5e7791e0be1",
+        "69cd4d3ce7779e060d6ea3e3",
+        "69cd85e74d309d4fc73fdfed",
+        "69cd6685b45239c34ecaa21e",
+        "69cd6513eb7905eef4fbdc3a",
+        "69ccb9528c83b81ca7c91e2c",
+        "69cce0819a3777d39163464d",
+        "69ccf81dbfeed1046d54ade3",
+        "69ccde9f1a1f9166480a8b26",
+        "69d9685d5f926a2a3ff27487",
+        "69d9684d0fda012adad24a49",
+        "69d94b94a00c0386d76414b8",
+        "69d9511e2498137450263c51",
+        "69d8a70d0fda012ada707fea"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Germany",
+      "resets_5d": 10,
+      "sample_size": 25
+    },
+    "6813b6d446e731854c7ac79e": {
+      "combat_ratio": 46.51,
+      "history": [
+        {
+          "combat_ratio": 46.51,
+          "resets_5d": 2,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "6882a786c91f768fd3f7278b",
+        "685d86e6a4eebc64d9f8f725",
+        "6882b2708ed720aa964cc170",
+        "6877853f521cb9c19b60aeaa",
+        "690529e201185a7932ddf7fe",
+        "688c4737005bc031f0a1d4a7",
+        "6842843ed0e381ccda5746ec",
+        "6910ac5675802288140ff70c",
+        "694b1681c7c907fff5ba6dff",
+        "6960e90acc472666cb90b5f6",
+        "6973bb37eed64c805d5a1b33",
+        "6981be6d7922e416bbc8c9a1",
+        "698ded23e105f15cf06b5fbe",
+        "698b1bd56bc7e7077d59eed8",
+        "699de261b19b2c5fe3a4b444",
+        "69a1a3c5ce3fdbcd3b008d1c",
+        "6918d931cc751d7f456c36a3",
+        "69a388a0e65e0d2bf921dbc0",
+        "691a593f45ce8539d0a4b55f",
+        "69b0542ab5486e4fd9f3cbc6",
+        "69b088efc5949dae6bf44614",
+        "69b1c3d0c5949dae6b55fdcc",
+        "69b3df194b0d180f67dde54d",
+        "69ad99b9618b3d609ef25ff7",
+        "699ec1a75a538fc336b42ebb"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "United Kingdom",
+      "resets_5d": 2,
+      "sample_size": 25
+    },
+    "6813b6d446e731854c7ac7a0": {
+      "combat_ratio": 0.0,
+      "history": [
+        {
+          "combat_ratio": 0.0,
+          "resets_5d": 8,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "69b555f43af735a9906c6486",
+        "69b46e1bb052a4f2e20ece7a",
+        "69bf0f5f0e1980dd1b8e89a5",
+        "69bd34221348cf457e66629d",
+        "69bd3ccd2b3745eea5601700",
+        "69bc3c6a84bbfcaa685c1e38",
+        "69baadacf25874079e9f24d0",
+        "69b7d116e94a969626b516f2",
+        "69b5b0b5579ffbb5e4b27072",
+        "69b4ad6e6eeec30d5962d00f",
+        "69c2b64092baf8f0c3dfd521",
+        "69c2e6575f22681ea534e7b4",
+        "69c12676ab2d54d20d2ace74",
+        "69be6148b036912afac6ae38",
+        "69bea7d4dcbd31be3aca1b98",
+        "69bcd2f22b5e4e5665f6ba17",
+        "69ba792a08ebed11edf989cf",
+        "69b53ff8d8430ef797b74a56",
+        "69cec0ef476990332b9fc69e",
+        "69ceb7d7b3a3e5e779a99245",
+        "69cc4198c6be9203a3bb43ad",
+        "69b838e7caa5376ae581193e",
+        "69da333b6eccf5f15a5e50e7",
+        "69d981bf486f47c70ee24b2b",
+        "69d76cba551e46f523eb00cc"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Netherlands",
+      "resets_5d": 8,
+      "sample_size": 25
+    },
+    "6813b6d446e731854c7ac7a4": {
+      "combat_ratio": 46.15,
+      "history": [
+        {
+          "combat_ratio": 46.15,
+          "resets_5d": 7,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "69b41ca244d8293440241af1",
+        "69b310c919f98f6ceba5b93e",
+        "69b2a698a583a3b5f9567890",
+        "69afe4f86dcb0df73b158b44",
+        "69aed4cf4b0d180f67567a54",
+        "69b03d1b4a0b814a34e06e9a",
+        "69ae5198b5486e4fd9bba5e3",
+        "69ba42913f756b6d59c124e2",
+        "69bc678d0f50f6f334a3c4aa",
+        "69b73e37805a5bf5ae2b2bdc",
+        "69b7bf95ca9a42b7ef66b7de",
+        "69b492545f34cb744fd46517",
+        "69b311efcbf2b5c108a623af",
+        "69b323877972e334e3bd22da",
+        "69b480b421a9ed4b968a4a40",
+        "69b0aedccbf2b5c108e339a1",
+        "69ae8a5b85ba2a296e70f5a8",
+        "69ae854f85ba2a296e65bf19",
+        "69ae007fa583a3b5f9eb48e8",
+        "69c4dc19cde5836cb7979931",
+        "69c1b1f7585318550a94c71b",
+        "69b85514c0dd19d33218e8d4",
+        "69b29bce2895f070b7e6fe90",
+        "69af4a68c5949dae6b93b391",
+        "69cfd1565752aefa8b3caaca"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Belgium",
+      "resets_5d": 7,
+      "sample_size": 25
+    },
+    "6813b6d446e731854c7ac7aa": {
+      "combat_ratio": 4.76,
+      "history": [
+        {
+          "combat_ratio": 4.76,
+          "resets_5d": 13,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "6919a2eb45ce8539d0500fe4",
+        "6918c782c6bbe2053f795626",
+        "68f5063db7bd4d5177772040",
+        "691df08dc6bbe2053fe5e334",
+        "6904e98375ad2efaf776bae8",
+        "6970b6bb58b9cb99aa54e974",
+        "6971fd57cb5a8a5462b6ed78",
+        "696d3017a7694f38eb709571",
+        "696bdb89d304116ae14859ad",
+        "698254af51756dc63315df49",
+        "696d381177fed94300fac03b",
+        "6994704fa95c454990aa5aba",
+        "6995b1356d4c5be819b7bc33",
+        "6993b5561b6ba9909c5b256e",
+        "6993a425cd957d3e93a9f2ad",
+        "6982b557e475769834b5569f",
+        "699b4302986493176029790f",
+        "69977d422dc9b74ec4681b0b",
+        "69959a32e855fe967af42dd4",
+        "6990a44d6488201809bdc6dd",
+        "696c18ce702d93d9d5f68dd5",
+        "6996f9f696787ce84baa6257",
+        "699915d9d87267cb1d85456d",
+        "697ea0199271365e8a85e15d",
+        "69ade91592668a04c70c6a31"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Portugal",
+      "resets_5d": 13,
+      "sample_size": 25
+    },
+    "6813b6d446e731854c7ac7e5": {
+      "combat_ratio": 15.38,
+      "history": [
+        {
+          "combat_ratio": 15.38,
+          "resets_5d": 7,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "68a716c362769c06bbe619c7",
+        "691c31c69317706a74ff84fe",
+        "6912b18159d39d64afbbc4f0",
+        "691a31f392948e91cb9d2334",
+        "690420f04c4e3789a41cf68d",
+        "6943c1cc980f402c92ce7879",
+        "69619a809aa619cc592ea334",
+        "696e0aef82ecc0f3cf5d509b",
+        "696d5777fe9d5e4fd70a652e",
+        "6918b289cc751d7f455cb802",
+        "6919387745ce8539d042fc98",
+        "68f5dd6a22a4934adae9e491",
+        "6952f188acdca89d8619919a",
+        "692eeffccd4d5524651ce880",
+        "68f789b046ad5078319c5bbf",
+        "69703b8eaadefa371703c72a",
+        "69827a0e7cf831a523f54bd7",
+        "696d1e537480b5635b033192",
+        "6919be1bdb65494c1b26afa1",
+        "6991461c6bb70e191fe7a395",
+        "698de9b6f4652a0daac50ffa",
+        "696b9c5ac9c4e2ee34af5bbf",
+        "698c0ef6dd9e998685eb9270",
+        "699675a41190015c68a2da19",
+        "69a271f6ef10a1245a784c5a"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "United States",
+      "resets_5d": 7,
+      "sample_size": 25
+    },
+    "6813b6d446e731854c7ac802": {
+      "combat_ratio": 0.0,
+      "history": [
+        {
+          "combat_ratio": 0.0,
+          "resets_5d": 2,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "6813b773efecdf9bab196e72",
+        "688e2575779d04817c1d08a6",
+        "69760f1028393f2225b1010c",
+        "69766a3ed0b91ae6b448f8ef",
+        "69762ebf4bfbdc5ce917b38d",
+        "6987b7e1ad2758110f11f580",
+        "6987b385537b1bf1e7606f98",
+        "6987a0b62fb0bdcb9107935b",
+        "6987b47da5d3382f28466950",
+        "6987a31fcfa2ae928252af28",
+        "6987a02ce0037f22c7284da9",
+        "69879eabb0b2351dbe88454a",
+        "6987a98a2fb0bdcb9126ca65",
+        "69a2ba05a8a3b031b7669b50",
+        "69a15d2d07b73de8faabca98",
+        "69a16022acd5ab212e02aa50",
+        "69a15d1b07b73de8faab1d9d",
+        "69a15bb8b23c69f10005da66",
+        "69a15b8f4d2abd93de8fe433",
+        "69a5dd0e129837ecc9b3f9b1",
+        "69a2d584a27535f584a4c21c",
+        "69a165e60ca0a7d5ff73533b",
+        "69a16114ec91a7019f7c5cf5",
+        "69a15be98cf8b70e48249008",
+        "6813b767efecdf9bab195f8b"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Norway",
+      "resets_5d": 2,
+      "sample_size": 25
+    },
+    "6813b6d446e731854c7ac808": {
+      "combat_ratio": 51.61,
+      "history": [
+        {
+          "combat_ratio": 51.61,
+          "resets_5d": 2,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "686d5998b39f079a4a6ab8bd",
+        "686222896c0e408991840f98",
+        "691a402bdb65494c1b646a40",
+        "6919ca3f8510e2692885fda6",
+        "686fce41b8d1854d9d207c8e",
+        "6932efe62ce8247c6c87cfcc",
+        "692eeaa942d109428e54aaff",
+        "696f5dadbea7a2698b4938a3",
+        "698cc1b121c06469eeb6a9e2",
+        "69974ca0b0a9df8277170755",
+        "683a88b98e35000e0108cbe8",
+        "6996594553a5ede8f66adfe0",
+        "69bc764ea9ceb0160dfb33e8",
+        "69bae5f81348cf457e2ace23",
+        "69c6d3298a595e2dca9560aa"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Canada",
+      "resets_5d": 2,
+      "sample_size": 15
+    },
+    "6813b6d546e731854c7ac848": {
+      "combat_ratio": 0.0,
+      "history": [
+        {
+          "combat_ratio": 0.0,
+          "resets_5d": 3,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "691b9ee792948e91cb1cffec",
+        "6917de6050d80e15bcdb91f9",
+        "69b933fe6843e2268ab37d0c",
+        "69b84ea0ac25743c3fc8710b",
+        "69b99646feade6de9e1a9125",
+        "69b875367ae3343efd514ae4",
+        "69b94d08caa5376ae5778a44",
+        "69cfcfce7c951c1d66bced6b",
+        "69d4158c6341955760edcd24",
+        "69cc2ac5a1cf1b9306930f0b",
+        "69d27ee27862e72e00400d4b",
+        "69b83f587ae3343efdbcd85d",
+        "691bb1a750d80e15bc06952b"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Morocco",
+      "resets_5d": 3,
+      "sample_size": 13
+    },
+    "6813b6d546e731854c7ac84e": {
+      "combat_ratio": 0.0,
+      "history": [
+        {
+          "combat_ratio": 0.0,
+          "resets_5d": 7,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "6999a9d29e864b6c118b8048",
+        "69b76ebe95d04b39a3984ba0",
+        "69c7bb89c1a06d6b1eb6b832",
+        "69cd7fe6d3c41fea89e78ebc",
+        "69d7d51fabd1bf8c1ff950f3",
+        "69d2a8a2c957f80717156eaf",
+        "69d027e0e3889832aea1dd41",
+        "69d1151d78e94f288e61780a",
+        "69d028158c2824b1034594f0",
+        "69d044f35098cc20271e21d0"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Tunisia",
+      "resets_5d": 7,
+      "sample_size": 10
+    },
+    "6813b6d546e731854c7ac858": {
+      "combat_ratio": 84.21,
+      "history": [
+        {
+          "combat_ratio": 84.21,
+          "resets_5d": 12,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "69a45b3221a5cf92d89285e3",
+        "69a19f15ec91a7019f18f687",
+        "699fbbc5c93cbbf890f17e91",
+        "699f760736961394b8b7023c",
+        "699f097c334c0732477d6790",
+        "699e632319024e8057b1d1f7",
+        "699e161a30100a1fd64f38a6",
+        "699df1de30100a1fd6f83955",
+        "699d0c4031b67b4758360a4e",
+        "699d067ba31a7b4b2a83c81f",
+        "699cdea8e398704ab06890ab",
+        "699cf848a7fd8a4e27333003",
+        "699cdf2b657b9604439ae537",
+        "699ca99ed321d631c318bfa0",
+        "699c9969b232a1efde0c9924",
+        "699cb17ba5d3feeeb39e1690",
+        "699bde77cbc612c0385f7816",
+        "69a9c1dc98c1c2c3d031eec3",
+        "69a5097b7eba1f779b76891a",
+        "699fed0ec93cbbf8901aa3ed",
+        "699fa0639a0b8b207792a3d2",
+        "699f519e6ff9e995cf7f5427",
+        "699e5da419024e8057ab5edc",
+        "699e103ed70af7f975395e09",
+        "699d9676d8ed65cda99b7a95"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Venezuela",
+      "resets_5d": 12,
+      "sample_size": 25
+    },
+    "683ddd2c24b5a2e114af15c5": {
+      "combat_ratio": 0.0,
+      "history": [
+        {
+          "combat_ratio": 0.0,
+          "resets_5d": 3,
+          "ts": "2026-05-18T12:44:56.790190+00:00"
+        }
+      ],
+      "known_veterans": [
+        "6818f900286675c678920eea",
+        "68299b85e10d9906654ce2ec",
+        "6820e463d7b95c3c75c20727",
+        "6878df0adb897ec4d58bf9cd",
+        "68970cf04fad0d6e36b2f310",
+        "68f50c56dd4b0abd5938c1cf",
+        "6914c6cfdf870cbb88a088c4",
+        "69150c494e48e9d359ce054c",
+        "682085d9d6fa1e7f1606ebcb",
+        "697738443fb914e84d782fef",
+        "6909a08da90de3b1c7cb1ba5",
+        "698b537def0c6320c861c3f2",
+        "69c3fa526853ceaa7a149222"
+      ],
+      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "name": "Iceland",
+      "resets_5d": 3,
+      "sample_size": 13
+    }
+  },
+  "last_run": "2026-05-18T12:44:56.790190+00:00",
+  "version": 3
+}
