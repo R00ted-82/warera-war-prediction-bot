@@ -44,7 +44,7 @@ STATE_VERSION = 3
 
 # Sampling per country
 ENUM_LIMIT = 100               # citizens per page via user.getUsersByCountry
-MAX_PAGES = 5                  # paginate up to this many pages of older citizens
+MAX_PAGES = 15                 # paginate up to this many pages of older citizens
 SAMPLE_TOP_N = 25              # of those that pass filters, keep top-N by level
 MIN_LEVEL = 20                 # ignore citizens below this level
 MIN_SAMPLE = 10                # skip countries with fewer eligible citizens
