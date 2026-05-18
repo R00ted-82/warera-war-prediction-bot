@@ -4,7 +4,17 @@ signals: bursts of skill resets (a strong leading indicator that people are
 repurposing themselves) and gradual climbs in the combat/economy skill-
 allocation ratio.
 
-Per run, for every country:
+Sampling is restricted to a watchlist built from two sources:
+  1. Countries currently controlling a region bordering Ireland (see
+     BORDER_REGION_NAMES — static list of region names, dynamic country
+     resolution at runtime)
+  2. Countries listed as Ireland's sworn enemy or active-war opponent
+     in the diplomatic data on the Ireland country object
+A country joins the watchlist if either criterion is met. Both fields
+update dynamically each run — no code change needed when controllers
+shift or wars are declared/ended.
+
+Per run, for every watchlisted country:
   - Fetch lite profiles for the country's known veterans (cached from prior
     runs) OR paginate user.getUsersByCountry to discover them, refreshing
     the cohort every DISCOVERY_INTERVAL_DAYS
@@ -42,6 +52,37 @@ WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 API_BASE = "https://warera-proxy.toie.workers.dev/trpc"
 STATE_FILE = Path("war_state.json")
 STATE_VERSION = 3
+IRELAND_COUNTRY_ID = "6813b6d446e731854c7ac7fe"
+
+# Regions that physically border Ireland (land or short sea routes). We sample
+# only countries that currently control one of these regions, since they're
+# the only ones in practical attack range. Update this list if Ireland
+# expands its territory — the API doesn't expose region adjacency, so this
+# can't be derived automatically. Region names must match exactly as
+# returned by region.getRegionsObject.
+BORDER_REGION_NAMES = {
+    # British Isles
+    "Northern Ireland",
+    "Scotland",
+    "Wales",
+    "Central England",
+    "Southeastern England",
+    # Channel and North Sea
+    "Brittany",
+    "Northern France",
+    # Iceland and North Atlantic islands
+    "Western Iceland",
+    "Northeastern Iceland",
+    "Eastern Iceland",
+    "Southern Iceland",
+    "Faroe Islands",
+    # Mid-Atlantic
+    "Azores",
+    # Transatlantic sea routes
+    "American Atlantic Coast",
+    "Atlantic Canada",
+    "Southern Greenland",
+}
 
 # Sampling per country
 ENUM_LIMIT = 100               # citizens per page via user.getUsersByCountry
@@ -121,6 +162,83 @@ def fetch_countries():
     if isinstance(data, dict) and "items" in data:
         return data["items"]
     return data or []
+
+
+def fetch_regions():
+    """Returns dict of region_id -> region object."""
+    data = trpc("region.getRegionsObject", {}) or {}
+    return data if isinstance(data, dict) else {}
+
+
+def fetch_ireland():
+    """Fetches Ireland's country object for diplomatic fields."""
+    try:
+        return trpc("country.getCountryById", {"countryId": IRELAND_COUNTRY_ID})
+    except Exception as e:
+        print(f"  warn: could not fetch Ireland country object: {e}",
+              file=sys.stderr)
+        return None
+
+
+def _extract_diplomatic_enemies(ireland):
+    """Returns dict country_id -> list of reasons ('sworn enemy', 'at war')."""
+    enemies = {}
+    if not ireland:
+        return enemies
+    sworn = ireland.get("swornEnemy") or ireland.get("enemy")
+    if sworn and isinstance(sworn, str):
+        enemies.setdefault(sworn, []).append("sworn enemy")
+    # War list field name varies in similar APIs; entries may be raw IDs or
+    # wrapped war objects with an opponent reference inside.
+    wars = (ireland.get("activeWars") or ireland.get("wars")
+            or ireland.get("warOpponents") or [])
+    for w in wars:
+        opponent = None
+        if isinstance(w, str):
+            opponent = w
+        elif isinstance(w, dict):
+            for key in ("opponent", "enemy", "country", "opponentCountry"):
+                if w.get(key) and isinstance(w[key], str):
+                    opponent = w[key]
+                    break
+        if opponent:
+            enemies.setdefault(opponent, []).append("at war")
+    return enemies
+
+
+def build_watchlist(regions_obj, ireland):
+    """Map of country_id -> {border_regions, diplomatic} describing why
+    each country is being monitored.
+
+    A country can earn a watchlist spot by controlling a border region,
+    by being listed as Ireland's sworn enemy or active-war opponent, or
+    both. Logs a warning for any BORDER_REGION_NAMES entry that doesn't
+    appear in the API response (typo or rename).
+    """
+    entries = {}
+    found_names = set()
+    for region in regions_obj.values():
+        if not isinstance(region, dict):
+            continue
+        name = region.get("name")
+        country_id = region.get("country")
+        if name in BORDER_REGION_NAMES:
+            found_names.add(name)
+            if country_id:
+                entries.setdefault(
+                    country_id, {"border_regions": [], "diplomatic": []}
+                )["border_regions"].append(name)
+    missing = BORDER_REGION_NAMES - found_names
+    if missing:
+        print(f"  warn: border regions not found in API: {sorted(missing)}",
+              file=sys.stderr)
+
+    for cid, reasons in _extract_diplomatic_enemies(ireland).items():
+        entries.setdefault(
+            cid, {"border_regions": [], "diplomatic": []}
+        )["diplomatic"].extend(reasons)
+
+    return entries
 
 
 def fetch_citizens_page(country_id, cursor=None):
@@ -306,9 +424,9 @@ def detect_reset_burst(history, current):
     """Returns dict describing the burst, or None."""
     prior = [h["resets_5d"] for h in history]
     if len(prior) < MIN_HISTORY_FOR_BASELINE:
-        # No reliable baseline yet, only fire on absolute floor
-        if current >= RESET_FLOOR:
-            return {"baseline_mean": None, "threshold": RESET_FLOOR, "current": current}
+        # No baseline yet, collect data silently. Reset rates vary widely
+        # across countries; firing on an absolute floor here would alert
+        # on routine background activity rather than mobilisation.
         return None
     mean = statistics.mean(prior)
     stdev = statistics.stdev(prior) if len(prior) > 1 else 0.0
@@ -363,7 +481,7 @@ def post_embed(payload):
 
 
 def trend_field(history, snap):
-    """Sparkline lines showing 14-run trends for resets and combat ratio."""
+    """Sparkline lines showing reset count and combat ratio trends."""
     if len(history) < 2:
         return "Not enough history yet."
     reset_series = [h["resets_5d"] for h in history] + [snap["resets_5d"]]
@@ -410,7 +528,7 @@ def send_high_severity_burst(country_name, snap, burst, history):
                 "inline": False,
             },
             {
-                "name": "Trend (last 14 runs)",
+                "name": "Trend",
                 "value": trend_field(history, snap),
                 "inline": False,
             },
@@ -488,7 +606,24 @@ def main():
     now = datetime.now(timezone.utc)
     state = load_state()
     countries = fetch_countries()
-    print(f"Loaded {len(countries)} countries.")
+    regions = fetch_regions()
+    watchlist = build_watchlist(regions)
+
+    country_name = {c["_id"]: c.get("name", c["_id"]) for c in countries if c.get("_id")}
+    total_border_regions = sum(len(v) for v in watchlist.values())
+    print(
+        f"Loaded {len(countries)} countries. Watchlist: {len(watchlist)} "
+        f"controlling {total_border_regions} border regions."
+    )
+    for cid in sorted(watchlist, key=lambda c: country_name.get(c, c)):
+        print(f"  {country_name.get(cid, cid)}: {', '.join(sorted(watchlist[cid]))}")
+
+    if not watchlist:
+        print("Empty watchlist, nothing to sample. Exiting.")
+        return
+
+    # Sample only countries that currently control a region neighbouring Ireland
+    countries = [c for c in countries if c.get("_id") in watchlist]
 
     snapshots = {}
     for i, country in enumerate(countries, 1):
@@ -514,7 +649,9 @@ def main():
 
     flagged = []
     high_sev_sent = 0
-    new_countries_state = {}
+    # Preserve state for countries not in this run's watchlist — if they
+    # rejoin later we keep their history available.
+    new_countries_state = dict(state.get("countries", {}))
 
     for cid, snap in snapshots.items():
         prev = state.get("countries", {}).get(cid, {})
