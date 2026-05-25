@@ -2,6 +2,8 @@
   "countries": {
     "6813b6d446e731854c7ac79a": {
       "combat_ratio": 81.82,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 81.4,
@@ -61,6 +63,10 @@
         "6945a97f91014485e27161bf",
         "69473a49955d216659cb3dc6"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-18T12:44:56.790190+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
@@ -94,6 +100,8 @@
     },
     "6813b6d446e731854c7ac79c": {
       "combat_ratio": 27.27,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 20.0,
@@ -147,6 +155,10 @@
         "69d8a70d0fda012ada707fea",
         "69d9511e2498137450263c51"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-18T12:44:56.790190+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
@@ -182,6 +194,8 @@
     },
     "6813b6d446e731854c7ac79e": {
       "combat_ratio": 46.51,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 44.83,
@@ -241,6 +255,10 @@
         "699ec1a75a538fc336b42ebb",
         "69b1c3d0c5949dae6b55fdcc"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-18T12:44:56.790190+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
@@ -271,7 +289,9 @@
       }
     },
     "6813b6d446e731854c7ac7a0": {
-      "combat_ratio": 34.62,
+      "combat_ratio": 28.0,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 20.0,
@@ -314,49 +334,64 @@
           "new_resets": 1,
           "resetter_combat_ratio": 14.29,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 28.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
         "69b555f43af735a9906c6486",
         "69b46e1bb052a4f2e20ece7a",
+        "69b468aa35541608f4449c5c",
+        "69b3c280e86aeacd8ca4a7c5",
+        "69b3b708c5949dae6b26eb6d",
+        "69b3b26644d82934405e9773",
         "69bf0f5f0e1980dd1b8e89a5",
-        "69b5b0b5579ffbb5e4b27072",
-        "69b4ad6e6eeec30d5962d00f",
-        "69baadacf25874079e9f24d0",
-        "69bd34221348cf457e66629d",
         "69bc3c6a84bbfcaa685c1e38",
-        "69b7d116e94a969626b516f2",
+        "69bd34221348cf457e66629d",
         "69bd3ccd2b3745eea5601700",
-        "69bea7d4dcbd31be3aca1b98",
-        "69c12676ab2d54d20d2ace74",
-        "69c2e6575f22681ea534e7b4",
-        "69ba792a08ebed11edf989cf",
-        "69be6148b036912afac6ae38",
-        "69b53ff8d8430ef797b74a56",
-        "69bcd2f22b5e4e5665f6ba17",
+        "69baadacf25874079e9f24d0",
+        "69b5b0b5579ffbb5e4b27072",
+        "69b7d116e94a969626b516f2",
+        "69b4ad6e6eeec30d5962d00f",
         "69c2b64092baf8f0c3dfd521",
+        "69c2e6575f22681ea534e7b4",
+        "69c12676ab2d54d20d2ace74",
+        "69be6148b036912afac6ae38",
+        "69bea7d4dcbd31be3aca1b98",
+        "69bcd2f22b5e4e5665f6ba17",
+        "69ba792a08ebed11edf989cf",
+        "69b53ff8d8430ef797b74a56",
         "69cec0ef476990332b9fc69e",
         "69ceb7d7b3a3e5e779a99245",
-        "69b838e7caa5376ae581193e",
-        "69cc4198c6be9203a3bb43ad",
-        "69d981bf486f47c70ee24b2b",
-        "69da333b6eccf5f15a5e50e7",
-        "69d76cba551e46f523eb00cc"
+        "69cc4198c6be9203a3bb43ad"
       ],
-      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
+      "last_discovery": "2026-05-25T19:47:24.866422+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Netherlands",
-      "new_resets": 1,
-      "resetter_combat_ratio": 14.29,
+      "new_resets": 0,
+      "resetter_combat_ratio": null,
       "sample_size": 25,
       "user_resets": {
+        "69b3b26644d82934405e9773": "2026-05-18T18:34:56.902Z",
+        "69b3b708c5949dae6b26eb6d": "2026-05-22T14:57:03.399Z",
+        "69b3c280e86aeacd8ca4a7c5": "2026-05-24T10:16:51.273Z",
+        "69b468aa35541608f4449c5c": "2026-05-10T19:52:19.337Z",
         "69b46e1bb052a4f2e20ece7a": "2026-05-22T12:43:00.547Z",
         "69b53ff8d8430ef797b74a56": "2026-04-23T12:50:26.489Z",
         "69b555f43af735a9906c6486": "2026-05-17T10:08:45.052Z",
         "69b5b0b5579ffbb5e4b27072": "2026-05-04T06:56:23.719Z",
         "69b7d116e94a969626b516f2": "2026-05-15T08:27:39.802Z",
-        "69b838e7caa5376ae581193e": "2026-05-20T13:35:55.450Z",
         "69ba792a08ebed11edf989cf": "2026-04-09T09:09:23.201Z",
         "69baadacf25874079e9f24d0": "2026-05-17T11:39:56.124Z",
         "69bc3c6a84bbfcaa685c1e38": "2026-05-14T11:50:15.800Z",
@@ -367,13 +402,13 @@
         "69c12676ab2d54d20d2ace74": "2026-05-24T13:48:52.333Z",
         "69c2e6575f22681ea534e7b4": "2026-05-10T08:12:19.730Z",
         "69cc4198c6be9203a3bb43ad": "2026-05-16T16:39:49.246Z",
-        "69cec0ef476990332b9fc69e": "2026-05-06T08:21:34.633Z",
-        "69d981bf486f47c70ee24b2b": "2026-05-18T12:21:38.201Z",
-        "69da333b6eccf5f15a5e50e7": "2026-05-18T18:25:50.047Z"
+        "69cec0ef476990332b9fc69e": "2026-05-06T08:21:34.633Z"
       }
     },
     "6813b6d446e731854c7ac7a2": {
       "combat_ratio": 40.91,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 40.91,
@@ -392,35 +427,47 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 40.91,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
+        "69d2ac1243a67adf4e024b7b",
+        "69d4ed54bc0ec32a4a42436d",
+        "69d7db33f7cc0387ad133431",
         "69d55e0f6b595becbf853d79",
         "69d54b733535a2f5c59c2969",
         "69d4e1d011bec0196ea8ecb9",
-        "69d4ed54bc0ec32a4a42436d",
-        "69d7db33f7cc0387ad133431",
-        "69d38c1843a5ff07f43d5da6",
+        "69d48aab60c7189005eaa325",
         "69d4dd1c70ab5601d0eb54d9",
         "69d3e6246341955760244029",
+        "69d38c1843a5ff07f43d5da6",
         "69d413fd9eefccc642122c94",
-        "69d48aab60c7189005eaa325",
-        "69d2ed249f38d300d59a2af1",
-        "69d390f1a6974fd542504690",
         "69d345fb9a1984dba5e7aa74",
+        "69d390f1a6974fd542504690",
         "69d2deee43a5ff07f4e38ecf",
+        "69d2ed249f38d300d59a2af1",
         "69d3bf008137730fe4345d1e",
-        "69d29f932813ceeb9b6456a9",
-        "69d2ac1243a67adf4e024b7b",
         "69d2cf922813ceeb9bbe9552",
         "69d2f03c1affba41e16fc6cd",
         "69d27621f7ff62dda5ce6824",
-        "69dbcf67f8d47c04e5d4582f",
+        "69d29f932813ceeb9b6456a9",
         "69dadb33e86a67f8f63a2672",
-        "69de381eaf97b01a97859a74",
+        "69dbcf67f8d47c04e5d4582f",
         "69dd6ef7af97b01a97fbbfaa",
+        "69de381eaf97b01a97859a74",
         "69dd649422f5623f08d5d8e6"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-23T09:42:45.900730+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
@@ -453,6 +500,8 @@
     },
     "6813b6d446e731854c7ac7a4": {
       "combat_ratio": 53.33,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 46.15,
@@ -495,36 +544,48 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 53.33,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
+        "69b310c919f98f6ceba5b93e",
+        "69b41ca244d8293440241af1",
+        "69b0aedccbf2b5c108e339a1",
         "69b03d1b4a0b814a34e06e9a",
         "69b2a698a583a3b5f9567890",
-        "69ae5198b5486e4fd9bba5e3",
-        "69afe4f86dcb0df73b158b44",
-        "69aed4cf4b0d180f67567a54",
-        "69b41ca244d8293440241af1",
-        "69b310c919f98f6ceba5b93e",
-        "69b480b421a9ed4b968a4a40",
+        "69bc678d0f50f6f334a3c4aa",
+        "69ba42913f756b6d59c124e2",
+        "69b492545f34cb744fd46517",
         "69b73e37805a5bf5ae2b2bdc",
         "69b7bf95ca9a42b7ef66b7de",
-        "69ae8a5b85ba2a296e70f5a8",
-        "69ae007fa583a3b5f9eb48e8",
+        "69b480b421a9ed4b968a4a40",
         "69b311efcbf2b5c108a623af",
         "69b323877972e334e3bd22da",
-        "69b0aedccbf2b5c108e339a1",
-        "69bc678d0f50f6f334a3c4aa",
-        "69b492545f34cb744fd46517",
-        "69ba42913f756b6d59c124e2",
-        "69ae854f85ba2a296e65bf19",
-        "69c1b1f7585318550a94c71b",
         "69c4dc19cde5836cb7979931",
         "69b85514c0dd19d33218e8d4",
-        "69af4a68c5949dae6b93b391",
+        "69c1b1f7585318550a94c71b",
         "69b29bce2895f070b7e6fe90",
-        "69cfd1565752aefa8b3caaca"
+        "69cfd1565752aefa8b3caaca",
+        "69caa9edb37e0eb78f499cff",
+        "69c65cfcc1a06d6b1e74ecfd",
+        "69b46b4bb34bca57fd13eba1",
+        "69d7ec8324981374504dd728",
+        "69da360ed11e8da853d42d0c",
+        "69d8c35f3553eff9bdbe964f",
+        "69d52703216f0b15398005ac"
       ],
-      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
+      "last_discovery": "2026-05-25T19:47:24.866422+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Belgium",
@@ -532,17 +593,13 @@
       "resetter_combat_ratio": null,
       "sample_size": 25,
       "user_resets": {
-        "69ae007fa583a3b5f9eb48e8": "2026-05-04T08:05:19.992Z",
-        "69ae5198b5486e4fd9bba5e3": "2026-05-14T06:46:06.936Z",
-        "69ae8a5b85ba2a296e70f5a8": "2026-05-16T08:41:31.231Z",
-        "69aed4cf4b0d180f67567a54": "2026-05-11T20:47:33.317Z",
-        "69afe4f86dcb0df73b158b44": "2026-05-09T02:51:39.018Z",
         "69b0aedccbf2b5c108e339a1": "2026-04-23T22:27:16.982Z",
         "69b29bce2895f070b7e6fe90": "2026-04-27T06:40:26.119Z",
         "69b2a698a583a3b5f9567890": "2026-05-17T07:38:04.928Z",
         "69b311efcbf2b5c108a623af": "2026-05-18T11:52:13.684Z",
         "69b323877972e334e3bd22da": "2026-05-19T08:07:48.698Z",
         "69b41ca244d8293440241af1": "2026-05-16T22:00:00.775Z",
+        "69b46b4bb34bca57fd13eba1": "2026-05-17T15:15:54.662Z",
         "69b492545f34cb744fd46517": "2026-05-17T17:38:47.472Z",
         "69b73e37805a5bf5ae2b2bdc": "2026-05-11T08:12:36.932Z",
         "69b7bf95ca9a42b7ef66b7de": "2026-05-10T17:33:10.444Z",
@@ -550,11 +607,18 @@
         "69ba42913f756b6d59c124e2": "2026-05-18T02:05:50.489Z",
         "69bc678d0f50f6f334a3c4aa": "2026-05-22T07:15:04.393Z",
         "69c1b1f7585318550a94c71b": "2026-05-18T20:03:23.529Z",
-        "69c4dc19cde5836cb7979931": "2026-05-10T06:09:14.941Z"
+        "69c4dc19cde5836cb7979931": "2026-05-10T06:09:14.941Z",
+        "69c65cfcc1a06d6b1e74ecfd": "2026-05-13T12:17:18.029Z",
+        "69caa9edb37e0eb78f499cff": "2026-05-15T07:18:53.525Z",
+        "69d52703216f0b15398005ac": "2026-04-25T19:56:59.245Z",
+        "69d7ec8324981374504dd728": "2026-04-16T13:15:46.042Z",
+        "69d8c35f3553eff9bdbe964f": "2026-04-18T19:49:59.167Z"
       }
     },
     "6813b6d446e731854c7ac7aa": {
       "combat_ratio": 4.76,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "known_veterans": [
         "6919a2eb45ce8539d0500fe4",
         "6918c782c6bbe2053f795626",
@@ -582,6 +646,10 @@
         "697ea0199271365e8a85e15d",
         "69ade91592668a04c70c6a31"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-18T12:44:56.790190+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
@@ -591,6 +659,8 @@
     },
     "6813b6d446e731854c7ac7b8": {
       "combat_ratio": 88.89,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 89.8,
@@ -603,25 +673,33 @@
           "new_resets": 1,
           "resetter_combat_ratio": 0.0,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 88.89,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
+        "6829c71bf9fe6076b38a5379",
         "681a2f5b4c586e01fbcadba4",
         "68288dae95ff84572bfd0337",
-        "6829c71bf9fe6076b38a5379",
-        "6825c9bab490ccafd670a30c",
         "6829f52d8c06514dc2a36f74",
+        "6825c9bab490ccafd670a30c",
         "683083ff9a4536aed996e114",
         "682b241487f122ddeb4bacb6",
         "681797320479a9ceb1902324",
         "6879d778820ed429e1825ffb",
         "6878b87a002311c68a3f3c26",
         "6878a9c67869eb193752b6d3",
+        "68266beec517b26c38b8fb0a",
         "682b6bb3e65588148785878e",
-        "6878f3592bdf9a42b590de26",
         "6878987463ae472cc7fb4f4a",
         "6878bb286097872ea4cce521",
-        "68266beec517b26c38b8fb0a",
+        "6878f3592bdf9a42b590de26",
         "682f7ce98dff660fbf201ea6",
         "688c3e804f7299ac68496349",
         "68474da33194d84192e6d54c",
@@ -629,15 +707,19 @@
         "6846c91929ce4e2dd13868a5",
         "690e5a730786722cb81566d4",
         "690b90816fdd2d7701fe85a8",
-        "690b1d5d5c3b907278d92d44",
-        "6920d4c46021f881e24ed130"
+        "6920d4c46021f881e24ed130",
+        "690b1d5d5c3b907278d92d44"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-24T09:46:58.727404+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Lithuania",
-      "new_resets": 1,
-      "resetter_combat_ratio": 0.0,
+      "new_resets": 0,
+      "resetter_combat_ratio": null,
       "sample_size": 25,
       "user_resets": {
         "681a2f5b4c586e01fbcadba4": "2026-04-03T02:50:26.231Z",
@@ -665,7 +747,9 @@
       }
     },
     "6813b6d446e731854c7ac7e5": {
-      "combat_ratio": 15.38,
+      "combat_ratio": 0.0,
+      "combat_resets": 0,
+      "eco_resets": 1,
       "history": [
         {
           "combat_ratio": 15.38,
@@ -708,36 +792,48 @@
           "new_resets": 1,
           "resetter_combat_ratio": 0.0,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 0.0,
+          "combat_resets": 0,
+          "eco_resets": 1,
+          "new_resets": 1,
+          "resetter_combat_ratio": 0.0,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
-        "68a716c362769c06bbe619c7",
         "691c31c69317706a74ff84fe",
         "6912b18159d39d64afbbc4f0",
         "691a31f392948e91cb9d2334",
-        "690420f04c4e3789a41cf68d",
-        "6943c1cc980f402c92ce7879",
         "69619a809aa619cc592ea334",
-        "696d5777fe9d5e4fd70a652e",
-        "6919387745ce8539d042fc98",
-        "6918b289cc751d7f455cb802",
+        "6943c1cc980f402c92ce7879",
         "696e0aef82ecc0f3cf5d509b",
+        "696d5777fe9d5e4fd70a652e",
+        "695041f32b332672a6278aff",
+        "6918b289cc751d7f455cb802",
+        "6952f188acdca89d8619919a",
+        "692eeffccd4d5524651ce880",
         "68f789b046ad5078319c5bbf",
         "68f5dd6a22a4934adae9e491",
-        "692eeffccd4d5524651ce880",
-        "6952f188acdca89d8619919a",
-        "6919be1bdb65494c1b26afa1",
-        "696d1e537480b5635b033192",
         "69827a0e7cf831a523f54bd7",
         "69703b8eaadefa371703c72a",
+        "696d1e537480b5635b033192",
+        "6919be1bdb65494c1b26afa1",
         "698de9b6f4652a0daac50ffa",
         "6991461c6bb70e191fe7a395",
-        "696b9c5ac9c4e2ee34af5bbf",
         "698c0ef6dd9e998685eb9270",
-        "699675a41190015c68a2da19",
-        "69a271f6ef10a1245a784c5a"
+        "696b9c5ac9c4e2ee34af5bbf",
+        "69a271f6ef10a1245a784c5a",
+        "696ef0a491307f1d7ce7090a",
+        "696a1e0ccd257554cd1950b9",
+        "69b0017ca403356a8a908828"
       ],
-      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
+      "last_discovery": "2026-05-25T19:47:24.866422+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "United States",
@@ -745,33 +841,34 @@
       "resetter_combat_ratio": 0.0,
       "sample_size": 25,
       "user_resets": {
-        "68a716c362769c06bbe619c7": "2026-05-24T18:52:51.360Z",
         "68f789b046ad5078319c5bbf": "2026-04-24T03:12:55.410Z",
-        "690420f04c4e3789a41cf68d": "2026-05-21T16:58:27.995Z",
         "6912b18159d39d64afbbc4f0": "2026-05-05T23:37:26.601Z",
-        "6919387745ce8539d042fc98": "2026-05-02T10:06:22.465Z",
         "6919be1bdb65494c1b26afa1": "2026-04-01T00:55:11.874Z",
         "691a31f392948e91cb9d2334": "2026-05-09T11:56:33.134Z",
         "691c31c69317706a74ff84fe": "2026-04-27T05:45:44.264Z",
         "692eeffccd4d5524651ce880": "2026-04-26T01:50:08.207Z",
         "6943c1cc980f402c92ce7879": "2026-05-18T15:19:24.609Z",
+        "695041f32b332672a6278aff": "2026-05-19T20:51:45.546Z",
         "6952f188acdca89d8619919a": "2026-04-23T10:52:27.293Z",
-        "69619a809aa619cc592ea334": "2026-05-13T10:37:08.451Z",
+        "69619a809aa619cc592ea334": "2026-05-25T15:21:01.869Z",
         "696b9c5ac9c4e2ee34af5bbf": "2026-05-14T07:55:03.525Z",
         "696d1e537480b5635b033192": "2026-05-14T06:24:30.977Z",
         "696d5777fe9d5e4fd70a652e": "2026-04-18T15:12:52.751Z",
         "696e0aef82ecc0f3cf5d509b": "2026-05-17T15:25:40.486Z",
+        "696ef0a491307f1d7ce7090a": "2026-05-22T12:48:05.145Z",
         "69703b8eaadefa371703c72a": "2026-05-13T02:06:04.280Z",
         "69827a0e7cf831a523f54bd7": "2026-05-20T04:31:04.710Z",
         "698c0ef6dd9e998685eb9270": "2026-04-26T06:14:13.160Z",
         "698de9b6f4652a0daac50ffa": "2026-05-09T13:55:55.800Z",
         "6991461c6bb70e191fe7a395": "2026-04-13T02:54:15.439Z",
-        "699675a41190015c68a2da19": "2026-05-16T20:55:47.058Z",
-        "69a271f6ef10a1245a784c5a": "2026-05-12T06:22:44.587Z"
+        "69a271f6ef10a1245a784c5a": "2026-05-12T06:22:44.587Z",
+        "69b0017ca403356a8a908828": "2026-04-28T04:57:22.252Z"
       }
     },
     "6813b6d446e731854c7ac7ef": {
-      "combat_ratio": 74.57,
+      "combat_ratio": 52.31,
+      "combat_resets": 0,
+      "eco_resets": 1,
       "history": [
         {
           "combat_ratio": 41.48,
@@ -802,6 +899,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 52.31,
+          "combat_resets": 0,
+          "eco_resets": 1,
+          "new_resets": 1,
+          "resetter_combat_ratio": 0.0,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
@@ -811,17 +916,21 @@
         "6955be14b1fc6d0b7bfde964",
         "6977a239ab7663db3ac03c5e",
         "69892fbcc5c82ef9aea416c3",
-        "696b989e1eb1704c85ed0a30",
         "69bd149d1348cf457e2c64bb",
+        "696b989e1eb1704c85ed0a30",
         "69c48d5e1bbe1908ba627f18",
         "69767e08d0b91ae6b45500bb"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-21T10:57:47.667268+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Denmark",
-      "new_resets": 0,
-      "resetter_combat_ratio": null,
+      "new_resets": 1,
+      "resetter_combat_ratio": 0.0,
       "sample_size": 10,
       "user_resets": {
         "682883d106241b38def41fcd": "2026-05-18T14:40:07.158Z",
@@ -830,12 +939,14 @@
         "695c6e3ffb75e9229fb7f417": "2026-05-20T04:05:10.526Z",
         "6977a239ab7663db3ac03c5e": "2026-05-13T21:29:01.576Z",
         "69892fbcc5c82ef9aea416c3": "2026-05-24T08:48:15.501Z",
-        "69bd149d1348cf457e2c64bb": "2026-05-18T15:29:30.789Z",
+        "69bd149d1348cf457e2c64bb": "2026-05-25T15:43:46.153Z",
         "69c48d5e1bbe1908ba627f18": "2026-05-21T06:37:11.918Z"
       }
     },
     "6813b6d446e731854c7ac7f2": {
       "combat_ratio": 84.38,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 84.38,
@@ -871,6 +982,10 @@
         "69df689286f55440dc50c0e5",
         "69df670fbd0b3c0772277379"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-24T09:46:58.727404+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
@@ -904,7 +1019,9 @@
       }
     },
     "6813b6d446e731854c7ac802": {
-      "combat_ratio": 71.79,
+      "combat_ratio": 69.81,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 0.0,
@@ -947,6 +1064,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 69.81,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
@@ -954,29 +1079,33 @@
         "688e2575779d04817c1d08a6",
         "69762ebf4bfbdc5ce917b38d",
         "69760f1028393f2225b1010c",
-        "69766a3ed0b91ae6b448f8ef",
-        "6987a02ce0037f22c7284da9",
-        "6987a31fcfa2ae928252af28",
-        "6987a0b62fb0bdcb9107935b",
-        "69879eabb0b2351dbe88454a",
-        "6987b385537b1bf1e7606f98",
-        "6987b47da5d3382f28466950",
         "6987b7e1ad2758110f11f580",
+        "6987a0b62fb0bdcb9107935b",
+        "6987b47da5d3382f28466950",
+        "6987a31fcfa2ae928252af28",
+        "6987b385537b1bf1e7606f98",
+        "69879eabb0b2351dbe88454a",
+        "6987a02ce0037f22c7284da9",
         "6987a98a2fb0bdcb9126ca65",
-        "69a15d2d07b73de8faabca98",
-        "69a15bb8b23c69f10005da66",
-        "69a15b8f4d2abd93de8fe433",
-        "69a16022acd5ab212e02aa50",
         "69a2ba05a8a3b031b7669b50",
+        "69a16370a5a565788e3b6d1e",
+        "69a16022acd5ab212e02aa50",
+        "69a15d2d07b73de8faabca98",
+        "69a15b8f4d2abd93de8fe433",
+        "69a15bb8b23c69f10005da66",
         "69a15d1b07b73de8faab1d9d",
+        "69a2d584a27535f584a4c21c",
         "69a5dd0e129837ecc9b3f9b1",
-        "6813b767efecdf9bab195f8b",
-        "69a15be98cf8b70e48249008",
-        "69a16114ec91a7019f7c5cf5",
+        "69a17818f4a972e0fe739991",
         "69a165e60ca0a7d5ff73533b",
-        "69a2d584a27535f584a4c21c"
+        "69a16114ec91a7019f7c5cf5",
+        "69a15be98cf8b70e48249008"
       ],
-      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
+      "last_discovery": "2026-05-25T19:47:24.866422+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Norway",
@@ -987,7 +1116,6 @@
         "688e2575779d04817c1d08a6": "2026-05-21T17:45:31.758Z",
         "69760f1028393f2225b1010c": "2026-05-06T18:40:41.898Z",
         "69762ebf4bfbdc5ce917b38d": "2026-05-15T22:03:34.960Z",
-        "69766a3ed0b91ae6b448f8ef": "2026-05-08T16:30:12.758Z",
         "69879eabb0b2351dbe88454a": "2026-05-20T18:06:09.979Z",
         "6987a02ce0037f22c7284da9": "2026-05-02T21:46:45.272Z",
         "6987a0b62fb0bdcb9107935b": "2026-05-09T23:08:31.407Z",
@@ -1001,14 +1129,18 @@
         "69a15d2d07b73de8faabca98": "2026-05-22T06:33:22.605Z",
         "69a16022acd5ab212e02aa50": "2026-05-21T01:42:55.347Z",
         "69a16114ec91a7019f7c5cf5": "2026-05-11T05:20:59.555Z",
+        "69a16370a5a565788e3b6d1e": "2026-05-03T08:12:46.668Z",
         "69a165e60ca0a7d5ff73533b": "2026-05-20T17:17:30.363Z",
+        "69a17818f4a972e0fe739991": "2026-05-06T12:33:11.638Z",
         "69a2ba05a8a3b031b7669b50": "2026-05-21T10:20:43.974Z",
         "69a2d584a27535f584a4c21c": "2026-05-10T16:39:15.541Z",
         "69a5dd0e129837ecc9b3f9b1": "2026-05-05T10:31:44.851Z"
       }
     },
     "6813b6d446e731854c7ac808": {
-      "combat_ratio": 62.5,
+      "combat_ratio": 51.56,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 51.61,
@@ -1051,34 +1183,51 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 51.56,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
         "686d5998b39f079a4a6ab8bd",
         "686222896c0e408991840f98",
-        "6919ca3f8510e2692885fda6",
         "691a402bdb65494c1b646a40",
+        "6919ca3f8510e2692885fda6",
         "686fce41b8d1854d9d207c8e",
+        "690420f04c4e3789a41cf68d",
         "6932efe62ce8247c6c87cfcc",
+        "6919387745ce8539d042fc98",
         "692eeaa942d109428e54aaff",
         "696f5dadbea7a2698b4938a3",
         "698cc1b121c06469eeb6a9e2",
         "69974ca0b0a9df8277170755",
-        "683a88b98e35000e0108cbe8",
         "6996594553a5ede8f66adfe0",
+        "683a88b98e35000e0108cbe8",
         "69bae5f81348cf457e2ace23",
         "69bc764ea9ceb0160dfb33e8",
-        "69c6d3298a595e2dca9560aa"
+        "69c6d3298a595e2dca9560aa",
+        "69de13e25bb1f1ef9ff44eb7"
       ],
-      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
+      "last_discovery": "2026-05-25T19:47:24.866422+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Canada",
       "new_resets": 0,
       "resetter_combat_ratio": null,
-      "sample_size": 15,
+      "sample_size": 18,
       "user_resets": {
         "686fce41b8d1854d9d207c8e": "2026-05-03T13:00:24.029Z",
+        "690420f04c4e3789a41cf68d": "2026-05-21T16:58:27.995Z",
+        "6919387745ce8539d042fc98": "2026-05-02T10:06:22.465Z",
         "6919ca3f8510e2692885fda6": "2026-05-15T21:14:38.846Z",
         "691a402bdb65494c1b646a40": "2026-05-11T13:33:37.904Z",
         "692eeaa942d109428e54aaff": "2026-05-18T01:17:34.963Z",
@@ -1092,6 +1241,8 @@
     },
     "6813b6d546e731854c7ac848": {
       "combat_ratio": 0.0,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 0.0,
@@ -1134,30 +1285,48 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 0.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
         "691b9ee792948e91cb1cffec",
         "6917de6050d80e15bcdb91f9",
-        "69b933fe6843e2268ab37d0c",
         "69b84ea0ac25743c3fc8710b",
-        "69b99646feade6de9e1a9125",
+        "69b933fe6843e2268ab37d0c",
         "69b94d08caa5376ae5778a44",
+        "69b99646feade6de9e1a9125",
         "69b875367ae3343efd514ae4",
-        "69b83f587ae3343efdbcd85d",
         "69cfcfce7c951c1d66bced6b",
+        "69b83f587ae3343efdbcd85d",
         "69d4158c6341955760edcd24",
         "69d27ee27862e72e00400d4b",
+        "69cc2ac5a1cf1b9306930f0b",
         "691bb1a750d80e15bc06952b",
-        "69cc2ac5a1cf1b9306930f0b"
+        "69e0d4efb6989dc2116ba37d",
+        "69dc26daf8d47c04e5390f51",
+        "69d7c5cdf5419ebd5ba66559",
+        "69d4ee43e83deb4e60e151c0",
+        "69d43d5c2e2a33a2ae5b912d",
+        "69c3c59e68a97bd50e031381"
       ],
-      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
+      "last_discovery": "2026-05-25T19:47:24.866422+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Morocco",
       "new_resets": 0,
       "resetter_combat_ratio": null,
-      "sample_size": 13,
+      "sample_size": 19,
       "user_resets": {
         "6917de6050d80e15bcdb91f9": "2026-05-20T23:10:12.768Z",
         "691b9ee792948e91cb1cffec": "2026-05-19T12:55:48.878Z",
@@ -1168,14 +1337,22 @@
         "69b933fe6843e2268ab37d0c": "2026-05-19T07:16:17.386Z",
         "69b94d08caa5376ae5778a44": "2026-05-15T23:56:46.706Z",
         "69b99646feade6de9e1a9125": "2026-05-07T09:27:23.628Z",
+        "69c3c59e68a97bd50e031381": "2026-04-22T16:31:48.033Z",
         "69cc2ac5a1cf1b9306930f0b": "2026-05-18T17:53:27.427Z",
         "69cfcfce7c951c1d66bced6b": "2026-04-21T21:35:17.186Z",
         "69d27ee27862e72e00400d4b": "2026-04-23T14:15:26.252Z",
-        "69d4158c6341955760edcd24": "2026-05-15T13:21:35.253Z"
+        "69d4158c6341955760edcd24": "2026-05-15T13:21:35.253Z",
+        "69d43d5c2e2a33a2ae5b912d": "2026-05-11T10:51:24.629Z",
+        "69d4ee43e83deb4e60e151c0": "2026-05-12T17:23:52.194Z",
+        "69d7c5cdf5419ebd5ba66559": "2026-05-05T23:04:44.182Z",
+        "69dc26daf8d47c04e5390f51": "2026-05-06T21:05:31.579Z",
+        "69e0d4efb6989dc2116ba37d": "2026-04-19T22:02:52.276Z"
       }
     },
     "6813b6d546e731854c7ac84e": {
       "combat_ratio": 0.0,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 0.0,
@@ -1218,42 +1395,66 @@
           "new_resets": 2,
           "resetter_combat_ratio": 42.11,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 0.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
         "6999a9d29e864b6c118b8048",
         "69b76ebe95d04b39a3984ba0",
         "69c7bb89c1a06d6b1eb6b832",
+        "69ceafe8f6e3d77336c6e789",
         "69cd7fe6d3c41fea89e78ebc",
-        "69d027e0e3889832aea1dd41",
         "69d2a8a2c957f80717156eaf",
+        "69d7d51fabd1bf8c1ff950f3",
         "69d044f35098cc20271e21d0",
         "69d1151d78e94f288e61780a",
-        "69d7d51fabd1bf8c1ff950f3",
-        "69d028158c2824b1034594f0"
+        "69d028158c2824b1034594f0",
+        "69d027e0e3889832aea1dd41",
+        "69d82709e86a67f8f6c9ea77",
+        "69e0a6e74e15eeb2990b0852",
+        "69d7f27492e0a751daa3879d",
+        "69d8e53dd6d9b31f49752860"
       ],
-      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
+      "last_discovery": "2026-05-25T19:47:24.866422+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Tunisia",
-      "new_resets": 2,
-      "resetter_combat_ratio": 42.11,
-      "sample_size": 10,
+      "new_resets": 0,
+      "resetter_combat_ratio": null,
+      "sample_size": 15,
       "user_resets": {
         "6999a9d29e864b6c118b8048": "2026-05-24T10:48:11.892Z",
         "69b76ebe95d04b39a3984ba0": "2026-05-16T01:42:27.214Z",
         "69c7bb89c1a06d6b1eb6b832": "2026-05-21T19:40:08.198Z",
         "69cd7fe6d3c41fea89e78ebc": "2026-04-15T13:44:36.632Z",
+        "69ceafe8f6e3d77336c6e789": "2026-05-24T23:37:02.389Z",
         "69d027e0e3889832aea1dd41": "2026-05-20T21:10:45.865Z",
         "69d028158c2824b1034594f0": "2026-05-24T13:53:47.083Z",
         "69d044f35098cc20271e21d0": "2026-05-14T18:56:30.179Z",
         "69d1151d78e94f288e61780a": "2026-05-16T15:03:02.639Z",
         "69d2a8a2c957f80717156eaf": "2026-05-22T01:35:32.088Z",
-        "69d7d51fabd1bf8c1ff950f3": "2026-05-24T00:12:12.895Z"
+        "69d7d51fabd1bf8c1ff950f3": "2026-05-24T00:12:12.895Z",
+        "69d7f27492e0a751daa3879d": "2026-05-20T18:21:04.638Z",
+        "69d82709e86a67f8f6c9ea77": "2026-05-03T15:22:26.826Z",
+        "69d8e53dd6d9b31f49752860": "2026-05-19T20:08:34.854Z",
+        "69e0a6e74e15eeb2990b0852": "2026-04-30T17:37:08.471Z"
       }
     },
     "6813b6d546e731854c7ac858": {
       "combat_ratio": 84.21,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "known_veterans": [
         "69a45b3221a5cf92d89285e3",
         "69a19f15ec91a7019f18f687",
@@ -1281,6 +1482,10 @@
         "699e103ed70af7f975395e09",
         "699d9676d8ed65cda99b7a95"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-18T12:44:56.790190+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
@@ -1290,6 +1495,8 @@
     },
     "6813b6d546e731854c7ac8a0": {
       "combat_ratio": 2.5,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 0.0,
@@ -1348,6 +1555,10 @@
         "69ce929b2315278ee68836d0",
         "69d42e332a7ca57f06880a33"
       ],
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
       "last_discovery": "2026-05-19T10:53:00.828380+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
@@ -1370,6 +1581,8 @@
     },
     "683ddd2c24b5a2e114af15c5": {
       "combat_ratio": 6.9,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 0.0,
@@ -1412,6 +1625,14 @@
           "new_resets": 1,
           "resetter_combat_ratio": 90.0,
           "ts": "2026-05-25T11:41:51.179590+00:00"
+        },
+        {
+          "combat_ratio": 6.9,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-25T19:47:24.866422+00:00"
         }
       ],
       "known_veterans": [
@@ -1424,17 +1645,21 @@
         "69150c494e48e9d359ce054c",
         "6914c6cfdf870cbb88a088c4",
         "682085d9d6fa1e7f1606ebcb",
-        "697738443fb914e84d782fef",
-        "6909a08da90de3b1c7cb1ba5",
+        "6955be14b1fc6d0b7bfde964",
+        "69c3fa526853ceaa7a149222",
         "698b537def0c6320c861c3f2",
-        "69c3fa526853ceaa7a149222"
+        "69d161d6904e27bdeea39cf7"
       ],
-      "last_discovery": "2026-05-18T12:44:56.790190+00:00",
+      "last_creep_alert": null,
+      "last_creep_delta": null,
+      "last_demob_alert": null,
+      "last_demob_delta": null,
+      "last_discovery": "2026-05-25T19:47:24.866422+00:00",
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Iceland",
-      "new_resets": 1,
-      "resetter_combat_ratio": 90.0,
+      "new_resets": 0,
+      "resetter_combat_ratio": null,
       "sample_size": 13,
       "user_resets": {
         "6818f900286675c678920eea": "2026-05-12T15:09:02.543Z",
@@ -1444,14 +1669,16 @@
         "68f50c56dd4b0abd5938c1cf": "2026-05-07T04:02:11.699Z",
         "6914c6cfdf870cbb88a088c4": "2026-04-19T09:50:04.421Z",
         "69150c494e48e9d359ce054c": "2026-05-15T12:37:44.265Z",
-        "697738443fb914e84d782fef": "2026-05-24T22:03:29.062Z",
-        "69c3fa526853ceaa7a149222": "2026-04-19T05:07:08.960Z"
+        "6955be14b1fc6d0b7bfde964": "2026-05-16T20:46:20.262Z",
+        "69c3fa526853ceaa7a149222": "2026-04-19T05:07:08.960Z",
+        "69d161d6904e27bdeea39cf7": "2026-05-05T16:08:33.572Z"
       }
     }
   },
   "flagged_last_run": [
-    "6813b6d446e731854c7ac802"
+    "6813b6d446e731854c7ac7e5",
+    "6813b6d446e731854c7ac7ef"
   ],
-  "last_run": "2026-05-25T11:41:51.179590+00:00",
-  "version": 4
+  "last_run": "2026-05-25T19:47:24.866422+00:00",
+  "version": 5
 }
