@@ -1,8 +1,18 @@
 name: War preparation alert
+
 on:
   schedule:
-    - cron: '0 8 * * *'   # 08:00 UTC daily
+    # Every 6 hours at :00. UTC. Picks up mobilisations within hours
+    # rather than a day late. The bot has per-country cooldowns so
+    # urgent alerts won't re-spam — see URGENT_COOLDOWN_DAYS in war_alert.py.
+    - cron: '0 */6 * * *'
   workflow_dispatch:
+
+# Prevents two runs from racing on war_state.json if a scheduled run
+# overlaps with a manual one. The second run waits for the first.
+concurrency:
+  group: war-alert
+  cancel-in-progress: false
 
 jobs:
   run:
@@ -24,4 +34,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add war_state.json
           git diff --quiet && git diff --staged --quiet || git commit -m "Update war_state.json"
+          git pull --rebase origin "$(git rev-parse --abbrev-ref HEAD)" || true
           git push
