@@ -1,86 +1,143 @@
-# War Watch
+# warera-war-alert
 
-Spots countries getting ready to attack Ireland by watching how their high-level players spend their skill points. War Era doesn't surface enemy preparation directly — but when citizens of a country start resetting their skills en masse, or when their combat allocation climbs day after day, it's a strong signal that mobilisation is underway.
+Discord bot that watches War Era for countries gearing up for war against Ireland (and ones that are visibly standing down). Every six hours, samples each watchlisted country's top active citizens for skill resets and shifts in combat-vs-economy skill allocation. Posts a digest embed when something looks worth knowing, plus dedicated alerts for high-severity events.
 
-Sibling of `alert.py` (production-bonus market notifier).
+Sibling of [`warera-tools-ireland`](https://github.com/to-ie/warera-tools-ireland) — same proxy, same Discord style, separate repo for focus.
 
-## What it watches
+## What you'll see
 
-A dynamic watchlist of countries within strategic reach of Ireland, plus anyone Ireland's currently at war with:
+Every run posts at most one **daily digest** embed listing flagged countries. The digest leads with a short explainer (sample = top ~25 active fighters, "combat focus" = share of skill points on combat) so first-time readers aren't guessing.
 
-- **Neighbours, up to 3 hops out.** Walks the game's region adjacency graph (`region.neighbors`) breadth-first from Ireland's territory. A country joins the watchlist if it controls any region within 3 hops. Direct attackers turn up at hop 1; countries that could plausibly project force via one or two intermediate conquests turn up at hops 2–3.
-- **Active war opponents.** Anything in Ireland's `warsWith` list, regardless of distance.
+In addition, certain events get their own dedicated alert message so they don't get lost in the digest.
 
-Watchlist is rebuilt from live API data each run. No code change needed when territory shifts or wars start/end.
+### Severity icons
 
-## Signals
+| Icon | Meaning |
+|---|---|
+| 🔴 | Active mobilisation or major combat shift — direct threat indicator |
+| 🟠 | Significant mobilisation or shift — caution |
+| 🟡 | Minor drift toward combat — keep an eye on it |
+| 🟢 | Country is standing down — reassuring |
+| 🕊️ | Dedicated stand-down alert — strong de-escalation signal |
+| ✅ | Country no longer flagged since last run |
 
-For each watchlisted country the script samples up to 25 active high-level citizens (level ≥ 20, online in the last 14 days) and tracks three numbers:
+Red is always danger to Ireland. Green is always reassurance. Yellow/orange sit on the mobilisation spectrum between them.
 
-- **New resets per run.** Each citizen's `lastSkillsResetAt` is compared to what was stored on the previous run. If it's advanced, that's a fresh reset event. Skill resets cost gold, so people don't do them casually — a burst means citizens are repurposing themselves, almost always for combat. Counted as discrete events rather than rolling windowed totals, so a single reset wave doesn't smear across days and inflate baselines.
-- **Combat / economy skill ratio.** Of points spent on bucketed combat skills (attack, precision, dodge, armour, loot, crits, health) vs economy skills (companies, entrepreneurship, production, management), what fraction is combat. Median across the full sample.
-- **Resetter combat ratio.** Same calculation, but median across only the citizens who reset this run. Catches the "30 people reset and they all came out at 90% combat" pattern even when the overall median barely budges.
+## What it detects
 
-All three go into a 14-day rolling history per country. From there:
+The bot watches five independent signals. A single country can trip multiple signals in a single run — each is reported.
 
-- **Reset burst** — current new_resets count is ≥ 2σ above that country's own rolling baseline, or ≥ 3 absolute (whichever is higher).
-- **Ratio creep** — combat ratio has climbed ≥ 20 percentage points since ~7 days ago.
+**Reset bursts.** A clutch of citizens wiping and rebuilding their skills in a single day. Skill resets cost gold, so a burst is rarely casual. Fires at ≥4 resets even with no baseline; once a country has history, it also fires at 2σ above the country's own (outlier-filtered) baseline.
 
-First ~5 runs after deployment (or after a schema migration) collect data silently while baselines build up.
+**Combat-intent resets.** Even one or two resets count, *if* the citizens who reset clearly rebuilt as combat fighters (≥70% combat allocation). Catches early-stage mobilisation in normally-quiet countries.
 
-## Output
+**Ratio creep / major combat shift.** The typical citizen's combat focus has risen significantly over the past day (≥30 points) or week (≥20 points). Tiered by magnitude: yellow at 20-40, orange at 40-60, red at 60+ (with dedicated alert).
 
-Three kinds of Discord messages:
+**Ratio collapse / standing down.** Mirror of the above on the green side. The typical citizen's combat focus has dropped significantly. Dedicated 🕊️ alert at 50+ point drops.
 
-- **High-severity bursts** get their own embed: ≥ 1.5× threshold or ≥ 10 new resets in a single run. Includes the resetter allocation as qualitative context (combat-skewed / balanced / economy-leaning) and sparkline trends. Per-country cooldown of 3 days between repeat urgent alerts, bypassed only if the burst escalates by 50%+ vs the last alert sent.
-- **Daily digest** — single summary embed listing every flagged country with 🔴/🟠/🟡 severity icons, plus a ✅ stand-down section for countries that were flagged previously but are quiet now. Posts whenever there's anything to report, including digests that are purely stand-downs.
-- **Health warnings** — separate embed if the watchlist comes back empty (critical, red) or if fewer than half of watchlisted countries can be sampled (degraded, yellow). Catches silent failures where the script runs but produces no useful data.
+**Eco-intent resets.** Mirror of combat-intent. Even one or two resets that rebuilt as workers (≤30% combat) flags as demobilising.
 
-If nothing's flagged, nothing's stood down, and the pipeline's healthy, nothing's posted.
+## Who it watches
+
+The bot doesn't monitor every country in the game — only those that pose a credible threat. The watchlist rebuilds every run from two sources:
+
+**Border controllers.** Countries currently controlling a region within `BORDER_HOPS` (default 3) hops of Ireland's territory. The adjacency graph is walked live from `region.getRegionsObject` each run, so if a country expands toward Ireland through conquest, they're added automatically.
+
+**Diplomatic enemies.** Countries listed in Ireland's `warsWith` field, pulled fresh each run from `country.getCountryById`.
+
+Typical watchlist size: 5-15 countries. Runs complete in 3-5 minutes.
+
+## How it samples
+
+For each watchlisted country, fetch lite profiles for the country's cached citizen IDs from prior runs. If the cache is stale (>7 days) or too many citizens have dropped below the activity threshold, paginate `user.getUsersByCountry` to rediscover the cohort. Newest-first, up to 15 pages.
+
+"Top citizen" means: level ≥ 20 and connected within the last 14 days. The top 25 by level make the sample.
+
+Per sample, the bot tracks:
+
+- **new_resets** — count of citizens whose `lastSkillsResetAt` advanced since the previous run. True event count, not windowed.
+- **combat_ratio** — median combat-skill allocation across the sample.
+- **resetter_combat_ratio** — median combat allocation of just those who reset since last run.
+- **combat_resets / eco_resets** — how many of those resets ended up strongly combat- or economy-focused.
+
+Combat skills: `attack`, `precision`, `dodge`, `armor`, `lootChance`, `criticalChance`, `criticalDamages`, `health`. Economy: `companies`, `entrepreneurship`, `production`, `management`. Energy and hunger are excluded as ambiguous.
+
+## Detection thresholds
+
+| Detector | Fires at |
+|---|---|
+| Reset burst (absolute floor) | ≥4 resets in one run, always |
+| Reset burst (σ-based) | ≥2σ above outlier-filtered rolling baseline (5+ runs of history) |
+| Combat-intent reset | ≥1 reset with resetter combat ≥70% |
+| Ratio creep (yellow) | ratio gained 20-40 points in 7d, or 30+ in 1d |
+| Ratio creep (orange) | ratio gained 40-60 points in 7d, or equivalent 1d |
+| Ratio creep (red) | ratio gained 60+ points in 7d, or equivalent 1d → dedicated alert |
+| Ratio collapse (green) | mirror of creep on the falling side, ≥50 points → dedicated alert |
+| Eco-intent reset | ≥1 reset with resetter combat ≤30% |
+
+Bursts at 1.5× their threshold OR 10+ absolute resets trigger a dedicated "War Preparation Detected" alert. Red-tier ratio creep triggers a dedicated "Major Combat Shift" alert. 50+ point drops trigger "Standing Down" alerts.
+
+All dedicated alerts have a per-country 3-day cooldown that's bypassed if severity escalates by 50%+.
+
+### Outlier-filtered baselines
+
+A country's own past mobilisations are excluded from its rolling baseline (any day where `new_resets ≥ 4` doesn't count toward the mean). Without this, a country that mobilised once becomes harder to detect next time. Falls back to the unfiltered series if filtering would leave too little baseline data.
+
+### History length
+
+The rolling history keeps `HISTORY_LEN = 56` entries per country. At the 6-hour cron cadence, that's ~14 days of context. If you change the cron cadence, scale `HISTORY_LEN` accordingly (`days_of_context × runs_per_day`).
 
 ## Setup
 
-```bash
-pip install requests
-export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
-python war.py
-```
+1. **Repo files.** `war_alert.py`, `requirements.txt` (just `requests`), `.github/workflows/war_alert.yml`, and this README.
+2. **Discord webhook.** New channel for war alerts. Channel settings → Integrations → Webhooks → copy URL.
+3. **GitHub secret.** Settings → Secrets and variables → Actions. Name `WAR_DISCORD_WEBHOOK_URL`, value = webhook URL.
+4. **First run.** Actions → "War preparation alert" → Run workflow. Takes 3-5 minutes, then commits `war_state.json`.
+5. **First day is calmer than before.** With the always-on absolute floor, you'll see real mobilisations from run 1, but the σ-based baseline detector still needs ~5 runs (~30 hours at 6h cadence) before it engages. False positives drop further after that.
 
-Schedule daily (the constants are tuned for that cadence).
+## Tuning
 
-## Configuration
+Constants at the top of `war_alert.py`. The ones you'll most likely touch:
 
-Top-of-file constants worth knowing:
-
-| Constant | Default | Notes |
+| Constant | Default | What it does |
 |---|---|---|
-| `BORDER_HOPS` | 3 | How far to expand the watchlist from Ireland's territory |
-| `SAMPLE_TOP_N` | 25 | High-level citizens sampled per country |
-| `MIN_LEVEL` | 20 | Below this is too noisy to read combat intent |
-| `MIN_SAMPLE` | 10 | Skip countries with fewer eligible citizens |
-| `ACTIVITY_WINDOW_DAYS` | 14 | "Active" if connected within this many days |
-| `DISCOVERY_INTERVAL_DAYS` | 7 | How often to re-paginate citizen lists |
-| `BASELINE_SIGMA` | 2.0 | Burst sensitivity |
-| `RESET_FLOOR` | 3 | Hard minimum new_resets to trigger an alert |
-| `RATIO_CREEP_PP` | 20.0 | pp gain that triggers a creep alert |
-| `RATIO_LOOKBACK_DAYS` | 7 | Creep lookback |
-| `URGENT_COOLDOWN_DAYS` | 3 | Per-country gap between repeat urgent alerts |
-| `URGENT_ESCALATION_FACTOR` | 1.5 | Bypasses cooldown if current burst is this much bigger than the last sent |
-| `HEALTH_SNAPSHOT_RATE` | 0.5 | Warn if fewer than this fraction of watchlist could be sampled |
+| `BORDER_HOPS` | 3 | How far out from Ireland's territory to watch. 1 = direct borders only |
+| `NO_BASELINE_RESET_FLOOR` | 4 | Always-on absolute floor for burst alerts |
+| `RESET_FLOOR` | 3 | σ-path floor once baseline exists |
+| `RATIO_CREEP_MIN` | 20.0 | Minimum 7-day combat-ratio gain for yellow creep |
+| `RATIO_CREEP_RED` | 60.0 | 7-day gain that promotes to red + dedicated alert |
+| `RATIO_DROP_MIN` | 20.0 | Minimum 7-day combat-ratio drop for green standdown |
+| `HIGH_DEMOB_FOR_ALERT` | 50.0 | Drop that triggers dedicated standdown alert |
+| `COMBAT_INTENT` | 70.0 | Resetter combat % counted as "rebuilt as combat fighter" |
+| `DEMOB_RESET_INTENT` | 30.0 | Resetter combat % counted as "rebuilt as worker" |
+| `MIN_LEVEL` | 20 | Minimum citizen level to include in sampling |
+| `URGENT_COOLDOWN_DAYS` | 3 | Per-country cooldown between repeat urgent alerts |
+| `HISTORY_LEN` | 56 | Rolling history entries per country (~14 days at 6h cadence) |
 
 ## State
 
-`war_state.json` sits next to the script. Versioned (`STATE_VERSION`); schema changes are handled by `migrate()` on load — older state files are brought up to the current schema automatically, so existing files are safe to keep across updates.
+`war_state.json` lives in the repo and is auto-committed every run. Holds per-country aggregate snapshots with rolling history, cached citizen IDs for fast next-run sampling, and cooldown timestamps for each alert type. Stays well under 1MB.
 
-Per-country, state holds: last 14 days of (new_resets, combat_ratio, resetter_combat_ratio) snapshots; cached citizen IDs (the "known veterans" cohort, refreshed weekly); per-citizen last-known reset timestamps (so a fresh reset on the next run can be detected); last urgent-alert timestamp and count (for cooldown logic).
+The state file is migrated automatically on first run after a schema change — current version is v5. Migrations are idempotent.
 
-Top-level: schema version, last run timestamp, and the list of country IDs flagged on the previous run (used to detect stand-downs).
+Delete `war_state.json` to reset baselines. The first ~5 runs after that will rely on the absolute floor only.
 
-Safe to delete; you'll just lose baselines and the first ~5 runs after deletion will be silent again.
+## Schedule
 
-## Notes
+Runs every 6 hours via GitHub Actions cron (`0 */6 * * *`). At this cadence, the worst-case lag between an event and an alert is ~6 hours and the average is ~3 hours. Bump to `*/3` or `*/2` if you want it tighter; the per-country cooldowns prevent spam regardless of cadence.
 
-- Ireland's country ID is hardcoded (`IRELAND_COUNTRY_ID`); swap it to monitor a different home country.
-- API access goes through the public proxy at `warera-proxy.toie.workers.dev/trpc`.
-- 3 hops is a reasonable default for a country with Ireland's geography. Drop to 1–2 if the watchlist gets noisy; bump to 4+ if long-range threats via chained conquests are a real concern.
-- After a schema migration, the first run will produce `new_resets = 0` for everyone — there's no prior reset cache to compare against, so all observations are first-time and seed the cache silently. From run 2 onwards the metric reflects real events between runs.
+The workflow has a concurrency group, so two runs can't race on the state file.
+
+## Known gaps
+
+**State-owned ammo production** isn't detected. Countries that stockpile through their own companies without citizen retraining will fly under the radar. Would need a separate watcher on `transaction.getPaginatedTransactions`.
+
+**Impulsive wars without a prep window** aren't caught. This bot detects mobilisation, not declarations from peacetime. To catch attacks-in-progress, watch battle creation events directly.
+
+**Pre-mobilisation diplomacy** isn't observable — by the time the first citizen pays gold to reset, the political decision was made days or weeks earlier. The earliest signal available in the game data is the first reset wave.
+
+**Tiny countries** with fewer than 10 active level-20+ citizens still show as "skipped" in logs. They can't mobilise meaningfully, so ignoring them is fine.
+
+## Credits
+
+Data via the [warera-proxy](https://warera-proxy.toie.workers.dev/) gateway and [warerastats.io](https://warerastats.io/). Made by toie.
