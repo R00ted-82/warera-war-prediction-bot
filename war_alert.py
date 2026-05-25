@@ -1016,10 +1016,15 @@ def _digest_line_burst(name, snap, burst, severity):
     if combat_resets >= 1 and rcr is not None and rcr >= COMBAT_INTENT:
         main += (
             f" — **{combat_resets} of {n}** rebuilt as combat fighters "
-            f"({rcr:.0f}% combat skills)"
+            f"({rcr:.0f}% combat skills). Concrete preparation signal."
         )
     elif rcr is not None:
-        main += f" (typical resetter is now {rcr:.0f}% combat)"
+        main += (
+            f" (typical resetter is now {rcr:.0f}% combat). "
+            f"Costly activity — usually means repurposing for combat."
+        )
+    else:
+        main += ". Costly activity — usually means repurposing for combat."
     return icon, name, main
 
 
@@ -1035,7 +1040,12 @@ def _digest_line_combat_intent(name, snap, intent):
         f"rebuilt as combat fighters ({rcr:.0f}% combat skills)"
     )
     if intent.get("corroborated_by") == "ratio_shift":
-        main += f" — confirmed by 7d ratio shift of +{intent['ratio_shift_7d']:.0f}pp"
+        main += (
+            f" — confirmed by 7d ratio shift of +{intent['ratio_shift_7d']:.0f}pp. "
+            f"Small numbers but directionally consistent with mobilisation."
+        )
+    else:
+        main += ". Multiple resetters in the same direction — early mobilisation signal."
     return icon, name, main
 
 
@@ -1043,9 +1053,9 @@ def _digest_line_creep(name, snap, creep):
     tier = creep.get("tier", "yellow")
     icon = {"red": "🔴", "orange": "🟠", "yellow": "🟡"}[tier]
     label = {
-        "red": "Major combat shift",
-        "orange": "Significant combat shift",
-        "yellow": "Drifting toward combat",
+        "red": "Major combat shift (likely war-ready)",
+        "orange": "Significant combat shift (mobilising)",
+        "yellow": "Drifting toward combat (worth watching)",
     }[tier]
     window = creep["window_days"]
     window_text = "the past day" if window == 1 else f"the past {window} days"
@@ -1060,21 +1070,16 @@ def _digest_line_collapse(name, snap, collapse):
     icon = "🟢"
     tier = collapse.get("tier", "green_light")
     label = {
-        "green_strong": "Strong stand-down",
-        "green_med": "Visible stand-down",
-        "green_light": "Drifting away from combat",
+        "green_strong": "Strong stand-down (campaign likely ending)",
+        "green_med": "Visible stand-down (de-escalating)",
+        "green_light": "Drifting away from combat (early stand-down signal)",
     }[tier]
     window = collapse["window_days"]
     window_text = "the past day" if window == 1 else f"the past {window} days"
     drop = abs(collapse["delta"])
-    likely = ""
-    if drop >= RATIO_DROP_RED:
-        likely = " — appears to be standing down from active campaign"
-    elif drop >= RATIO_DROP_ORANGE:
-        likely = " — likely de-escalating"
     main = (
         f"{label}: typical citizen went from **{collapse['old_ratio']:.0f}% → "
-        f"{snap['combat_ratio']:.0f}% combat** over {window_text}{likely}"
+        f"{snap['combat_ratio']:.0f}% combat** over {window_text}"
     )
     return icon, name, main
 
@@ -1088,10 +1093,15 @@ def _digest_line_eco_intent(name, snap, intent):
     citizen = "citizen" if n == 1 else "citizens"
     main = (
         f"**{n} of {total}** {citizen} (out of {sample} top citizens) "
-        f"rebuilt as workers ({rcr:.0f}% combat skills) — demobilising"
+        f"rebuilt as workers ({rcr:.0f}% combat skills)"
     )
     if intent.get("corroborated_by") == "ratio_shift":
-        main += f" — confirmed by 7d ratio shift of {intent['ratio_shift_7d']:.0f}pp"
+        main += (
+            f" — confirmed by 7d ratio shift of {intent['ratio_shift_7d']:.0f}pp. "
+            f"Small numbers but directionally consistent with demobilisation."
+        )
+    else:
+        main += ". Multiple resetters returning to economy — early stand-down signal."
     return icon, name, main
 
 
@@ -1199,29 +1209,86 @@ def send_digest(flagged, stood_down, holding, now):
             more = f" (+{len(minor_dedup) - 12} more)"
         fields.append({
             "name": "🟡 Minor activity",
-            "value": ", ".join(labels) + more,
+            "value": (
+                "_Soft signals, individually below threshold — listed "
+                "for awareness, not action._\n"
+                + ", ".join(labels) + more
+            ),
             "inline": False,
         })
 
     if holding:
         holding_lines = []
         for h in sorted(holding, key=lambda x: -x["current_ratio"])[:15]:
-            holding_lines.append(
-                f"**{h['name']}** — {h['current_ratio']:.0f}% combat "
-                f"(peaked {h['peak_ratio']:.0f}% on "
-                f"{h['peak_date']})"
-            )
+            if h.get("reason") == "active_war":
+                line = (
+                    f"**{h['name']}** — {h['current_ratio']:.0f}% combat "
+                    f"(actively at war with Ireland)"
+                )
+            elif h.get("peak_date") and h["peak_date"] != "unknown":
+                line = (
+                    f"**{h['name']}** — {h['current_ratio']:.0f}% combat "
+                    f"(peaked {h['peak_ratio']:.0f}% on {h['peak_date']})"
+                )
+            else:
+                line = (
+                    f"**{h['name']}** — {h['current_ratio']:.0f}% combat "
+                    f"(still in combat posture)"
+                )
+            holding_lines.append(line)
         fields.append({
             "name": "🟠 Holding at high readiness",
-            "value": "\n".join(holding_lines),
+            "value": (
+                "_Previously mobilised, no fresh activity this run, "
+                "but combat posture remains. Not a new warning — a "
+                "reminder these countries are still elevated._\n"
+                + "\n".join(holding_lines)
+            ),
             "inline": False,
         })
 
     if stood_down:
-        stood_names = sorted(name for _, name in stood_down)
+        stood_down_lines = []
+        # Group by reason so it's readable when several countries fall
+        # into the same bucket
+        by_reason = {"ratio_dropped": [], "soft_flag": [], "retired_no_data": []}
+        for s in stood_down:
+            by_reason.setdefault(s["reason"], []).append(s)
+
+        for s in by_reason.get("ratio_dropped", []):
+            if s.get("peak_ratio") is not None:
+                stood_down_lines.append(
+                    f"**{s['name']}** — combat focus dropped "
+                    f"{s['peak_ratio']:.0f}% → {s['current_ratio']:.0f}% "
+                    f"(de-escalating)"
+                )
+            else:
+                stood_down_lines.append(
+                    f"**{s['name']}** — de-escalating "
+                    f"(now {s['current_ratio']:.0f}% combat)"
+                )
+
+        soft = by_reason.get("soft_flag", [])
+        if soft:
+            names = ", ".join(s["name"] for s in soft)
+            stood_down_lines.append(
+                f"{names} — never highly mobilised; activity quieted"
+            )
+
+        retired = by_reason.get("retired_no_data", [])
+        if retired:
+            names = ", ".join(s["name"] for s in retired)
+            stood_down_lines.append(
+                f"{names} — previous flag retired "
+                f"(was based on signals that no longer qualify)"
+            )
+
         fields.append({
             "name": "✅ No longer flagged",
-            "value": ", ".join(stood_names),
+            "value": (
+                "_Countries removed from watch this run, with reasons._\n"
+                + "\n".join(stood_down_lines)
+            ),
             "inline": False,
         })
 
@@ -1298,39 +1365,58 @@ def classify_post_flag_state(
     """When a country was flagged last run and isn't this run, decide
     whether it actually stood down or is just holding at high readiness.
 
-    Returns one of: "stood_down", "holding", None.
-    None means "report nothing" — e.g. it's an active war, treat as
-    ongoing.
+    Returns a tuple (classification, reason) where classification is one
+    of "stood_down" or "holding", and reason is a short string used to
+    explain the outcome in the digest.
+
+    Reason codes for "stood_down":
+      - "ratio_dropped"   : real de-escalation; ratio fell meaningfully
+                            from a recorded peak.
+      - "soft_flag"       : never highly mobilised; original flag was a
+                            single-resetter or low-ratio event.
+      - "retired_no_data" : was flagged before v6, no peak recorded.
+                            Cannot prove past mobilisation, so we retire
+                            the flag rather than upgrade it to "holding"
+                            on faith.
+
+    Reason codes for "holding":
+      - "active_war"      : Ireland is at war with them; "stood down" is
+                            structurally wrong.
+      - "ratio_high"      : current ratio above ceiling AND we have peak
+                            data confirming past mobilisation.
     """
     # Active war → never declare stand-down. The country is still a
     # threat regardless of what the resetters did this run.
     if cid in active_war_ids:
-        return "holding"
+        return ("holding", "active_war")
 
     current_ratio = snap["combat_ratio"]
     peak_ratio = prev_country.get("last_flagged_peak_ratio")
 
-    # If we don't have a peak (e.g. flag came from before v6 migration),
-    # use the conservative approach: high current ratio = holding.
+    # No peak recorded → we can't honestly call this "holding at high
+    # readiness" because we have no evidence the country was ever
+    # mobilised. Retire the flag cleanly with a reason that says so.
+    # This avoids the bad post-migration case where a country flagged
+    # for soft reasons (eco_intent on n=1, etc.) gets upgraded to a
+    # high-readiness label just because its current ratio happens to be
+    # above 50%.
     if peak_ratio is None:
-        if current_ratio >= STAND_DOWN_RATIO_CEILING:
-            return "holding"
-        return "stood_down"
+        return ("stood_down", "retired_no_data")
 
     drop_from_peak = peak_ratio - current_ratio
+
+    # Genuine de-escalation: ratio meaningfully below peak AND now below
+    # the combat-posture ceiling.
+    if drop_from_peak >= STAND_DOWN_DROP_MIN and current_ratio < STAND_DOWN_RATIO_CEILING:
+        return ("stood_down", "ratio_dropped")
+
+    # Still high → holding. Peak data backs this up.
     if current_ratio >= STAND_DOWN_RATIO_CEILING:
-        # Still in combat posture. Even if ratio fell some from peak,
-        # 50%+ allocation to combat is not "stood down".
-        return "holding"
+        return ("holding", "ratio_high")
 
-    if drop_from_peak >= STAND_DOWN_DROP_MIN:
-        return "stood_down"
-
-    # Ratio is below the ceiling but didn't drop much from peak either.
-    # This is a country that was never highly mobilised — the original
-    # flag was likely a soft creep or single-resetter event. Quietly
-    # drop from watch without making a fuss.
-    return "stood_down"
+    # Ratio is below the ceiling and didn't drop much from peak. The
+    # country was never strongly mobilised; the original flag was soft.
+    return ("stood_down", "soft_flag")
 
 
 # ---------- Main ----------
@@ -1569,18 +1655,24 @@ def main():
     sampled_ids = set(snapshots.keys())
     no_longer_flagged_ids = (prev_flagged_ids & sampled_ids) - current_flagged_ids
 
-    stood_down = []
+    stood_down = []  # list of (cid, name, reason)
     holding = []
     for cid in no_longer_flagged_ids:
         snap = snapshots[cid]
         prev_country = state.get("countries", {}).get(cid, {})
-        classification = classify_post_flag_state(
+        classification, reason = classify_post_flag_state(
             cid, prev_country, snap, active_war_ids
         )
         name = (country_name.get(cid) or prev_country.get("name") or cid)
 
         if classification == "stood_down":
-            stood_down.append((cid, name))
+            stood_down.append({
+                "cid": cid,
+                "name": name,
+                "reason": reason,
+                "current_ratio": snap["combat_ratio"],
+                "peak_ratio": prev_country.get("last_flagged_peak_ratio"),
+            })
             # Clear the flagged-peak tracking — next time they get flagged,
             # we start fresh.
             new_countries_state[cid]["last_flagged_at"] = None
@@ -1597,6 +1689,7 @@ def main():
                 "current_ratio": snap["combat_ratio"],
                 "peak_ratio": peak,
                 "peak_date": peak_date,
+                "reason": reason,
             })
             # Stay in flagged_last_run so we keep watching. The country
             # isn't producing fresh alerts but we're tracking that it's
