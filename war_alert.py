@@ -94,7 +94,11 @@ HTTP_TIMEOUT = 30
 RETRY_ATTEMPTS = 3
 
 # Detection
-HISTORY_LEN = 14
+HISTORY_LEN = 56               # rolling history kept per country.
+                               # At 4 runs/day (every 6h cron) this is ~14 days
+                               # of context, matching the original 1-run/day setup.
+                               # If you change the cron cadence, scale this:
+                               # HISTORY_LEN = days_of_context × runs_per_day.
 MIN_HISTORY_FOR_BASELINE = 5
 BASELINE_SIGMA = 2.0
 RESET_FLOOR = 3                # per-run reset count needed once we HAVE a baseline
