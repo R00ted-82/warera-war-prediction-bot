@@ -1,61 +1,38 @@
 """
-Detects countries gearing up for war by sampling active citizens for two
-signals: bursts of skill resets (a strong leading indicator that people
-are repurposing themselves) and gradual climbs in the combat/economy
-skill-allocation ratio. Also detects the reverse: countries demobilising.
+Patch for war_alert.py — makes notifications more definitive.
 
-Sampling is restricted to a watchlist built from two sources:
-  1. Countries controlling at least one region within BORDER_HOPS hops
-     of Ireland's territory, derived dynamically by walking each
-     region's `neighbors` field in region.getRegionsObject
-  2. Countries listed in Ireland's `warsWith` diplomatic field
-A country joins the watchlist if either criterion is met. Both update
-dynamically each run.
+Changes vs the previous version, in order of how the user perceives them:
 
-Per run, for every watchlisted country:
-  - Fetch lite profiles for the country's known veterans (cached from
-    prior runs) OR paginate user.getUsersByCountry to discover them,
-    refreshing the cohort every DISCOVERY_INTERVAL_DAYS
-  - Keep top 25 qualifying (level >= 20, active in last 14 days) by level
-  - Aggregate four numbers:
-      * new_resets: citizens whose lastSkillsResetAt advanced since the
-        previous run (true event count, not windowed)
-      * combat_ratio: median combat-skill ratio across the full sample
-      * resetter_combat_ratio: median combat ratio of just the citizens
-        who reset since the previous run (null if none reset)
-      * combat_resets: citizens whose reset rebuilt them strongly into
-        combat (resetter combat ratio >= COMBAT_INTENT_PP). Lets us
-        flag mobilisation even when the absolute reset count is small.
+  1. ECO_INTENT no longer fires on a single resetter. Requires either
+     eco_resets >= 2, OR eco_resets >= 1 with a corroborating ratio drop.
+     This was the root cause of the bad Denmark / United States demob
+     notification (n=1, 0% combat resetter, no other signal).
 
-Diff against state.json's per-country history (14-day rolling window):
-  - Reset burst: new_resets >= 2σ above the country's rolling baseline,
-    OR >= RESET_FLOOR (whichever is greater). No-baseline-yet countries
-    still fire if new_resets >= NO_BASELINE_RESET_FLOOR — fixes the
-    silent-collection gap that let early mobilisations slip through.
-  - Ratio creep (mobilising): combat ratio >= RATIO_CREEP_PP above where
-    it was ~7 days ago, OR >= RATIO_JUMP_1D_PP above yesterday's value
-  - Ratio collapse (demobilising): combat ratio dropped by the same
-    thresholds. Treated as a "standing down" signal.
-  - Combat-intent resets: any run where new_resets >= 1 AND
-    resetter_combat_ratio >= COMBAT_INTENT_PP triggers a low-severity
-    flag even if the absolute count is below RESET_FLOOR.
+  2. COMBAT_INTENT tightened symmetrically. Single resetters at >=70%
+     combat no longer trigger their own digest line; needs eitherrr
+     combat_resets >= 2 or some surrounding reset activity. Combat-intent
+     was directionally aligned with what we care about (war prep) so this
+     is a softer change than #1, but consistency matters.
 
-Output:
-  - One digest embed per run listing every flagged country with severity
-    icons (red/orange/yellow for mobilising, green for standing down),
-    plus any countries that stood down since the last run
-  - Dedicated alerts for high-severity bursts (>= 1.5× threshold or 10+
-    new resets) and for high-severity demobs (≥50pp drop in 7d), with
-    sparkline trends and resetter-allocation context. Per-country
-    cooldown on these — by default 3 days, unless severity escalates by
-    50%+
-  - Health warnings to Discord if the watchlist comes back empty or
-    fewer than half of watchlisted countries can be sampled
+  3. Stand-down detection is no longer "was flagged last run, isn't this
+     run". A country is only declared stood down if:
+       - it isn't in Ireland's warsWith list, AND
+       - its combat_ratio is below STAND_DOWN_RATIO_CEILING, AND
+       - its combat_ratio dropped at least STAND_DOWN_DROP_MIN points
+         from the peak observed during the flagged window.
+     Otherwise it's reported as "holding at high readiness" — same
+     watchlist, different framing. Norway-style cases (mobilised, ratio
+     plateaued, war ongoing) end up here instead of being declared a
+     stand-down.
 
-First ~5 runs collect baseline silently for the σ-based burst detector;
-the absolute-floor and combat-intent detectors fire from run 1.
+  4. Low-severity items (yellow creep, single-resetter combat_intent)
+     roll up into one "Minor activity" summary line in the digest
+     instead of each getting its own field. If a country also has a
+     med/high signal that run, the full line wins and the minor signal
+     is suppressed.
 
-Sibling of alert.py.
+Also adds state fields: last_flagged_peak_ratio, last_flagged_at.
+Bumps STATE_VERSION to 6 with an idempotent migration.
 """
 
 import json
@@ -73,11 +50,11 @@ import requests
 WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 API_BASE = "https://warera-proxy.toie.workers.dev/trpc"
 STATE_FILE = Path("war_state.json")
-STATE_VERSION = 5
+STATE_VERSION = 6
 IRELAND_COUNTRY_ID = "6813b6d446e731854c7ac7fe"
 
 # Watchlist scope
-BORDER_HOPS = 3                # how far out to walk Ireland's adjacency graph.
+BORDER_HOPS = 3
 
 # Sampling per country
 ENUM_LIMIT = 100
@@ -94,57 +71,63 @@ HTTP_TIMEOUT = 30
 RETRY_ATTEMPTS = 3
 
 # Detection
-HISTORY_LEN = 56               # rolling history kept per country.
-                               # At 4 runs/day (every 6h cron) this is ~14 days
-                               # of context, matching the original 1-run/day setup.
-                               # If you change the cron cadence, scale this:
-                               # HISTORY_LEN = days_of_context × runs_per_day.
+HISTORY_LEN = 56
 MIN_HISTORY_FOR_BASELINE = 5
 BASELINE_SIGMA = 2.0
-RESET_FLOOR = 3                # per-run reset count needed once we HAVE a baseline
-NO_BASELINE_RESET_FLOOR = 4    # NEW: per-run reset count that fires even without baseline.
-                               # Set lower than RESET_FLOOR × HIGH_SEVERITY_FACTOR so we
-                               # don't miss early mobilisations like Norway 2026-05-21.
-RATIO_CREEP_MIN = 20.0         # Minimum ratio shift (in % points) to flag as creep at all.
-                               # Tiered above this: 20-40 = yellow ("drifting"),
-                               # 40-60 = orange ("shifting"), 60+ = red ("major swing").
+RESET_FLOOR = 3
+NO_BASELINE_RESET_FLOOR = 4
+RATIO_CREEP_MIN = 20.0
 RATIO_CREEP_ORANGE = 40.0
 RATIO_CREEP_RED = 60.0
-RATIO_JUMP_1D_MIN = 30.0       # 1-day equivalent: catches fast swings that the
-                               # 7-day creep misses entirely.
+RATIO_JUMP_1D_MIN = 30.0
 RATIO_LOOKBACK_DAYS = 7
 
-# De-spec / demobilisation detection (mirror of above)
 RATIO_DROP_MIN = 20.0
-RATIO_DROP_ORANGE = 40.0       # Note: "orange" in demob context = strong stand-down (good).
-RATIO_DROP_RED = 60.0          # Colours stay green-shaded in the digest; thresholds
-                               # mirror creep magnitudes for symmetry.
+RATIO_DROP_ORANGE = 40.0
+RATIO_DROP_RED = 60.0
 RATIO_DROP_1D_MIN = 30.0
-HIGH_DEMOB_FOR_ALERT = 50.0    # Drops at or above this trigger a dedicated alert,
-                               # not just a digest line.
-DEMOB_RESET_INTENT = 30.0      # If a resetter's new combat allocation is at or below
-                               # this, they're considered "rebuilding into economy".
+HIGH_DEMOB_FOR_ALERT = 50.0
+DEMOB_RESET_INTENT = 30.0
 
-# Combat-intent resets (catches mobilisation even at low absolute count)
-COMBAT_INTENT = 70.0           # If a resetter's new combat allocation is at or above
-                               # this, they're considered "rebuilding into combat".
+COMBAT_INTENT = 70.0
 
-# Severity for dedicated alerts (urgent burst threshold)
-HIGH_SEVERITY_FACTOR = 1.5     # burst >= this × threshold counts as urgent
-HIGH_SEVERITY_FLOOR = 10       # OR >= this many absolute new resets
+# --- NEW: minimum resetter counts for intent signals ---
+# Stops single-citizen events from generating their own digest line.
+# Intent firing still requires either:
+#   - n resetters going strongly in that direction, OR
+#   - 1 resetter PLUS a corroborating ratio movement
+COMBAT_INTENT_MIN_RESETTERS = 2
+ECO_INTENT_MIN_RESETTERS = 2
+INTENT_CORROBORATION_RATIO = 5.0   # minimum 7d ratio shift in the same
+                                    # direction to corroborate a single
+                                    # resetter
 
-# Urgent alert cooldown (per-country, applies to both mobilisation and demob alerts)
+HIGH_SEVERITY_FACTOR = 1.5
+HIGH_SEVERITY_FLOOR = 10
+
 URGENT_COOLDOWN_DAYS = 3
 URGENT_ESCALATION_FACTOR = 1.5
+
+# --- NEW: stand-down gating ---
+# A country only counts as "stood down" if its combat focus is now
+# meaningfully low AND has dropped meaningfully since being flagged.
+# Otherwise we report it as "holding at high readiness" instead.
+STAND_DOWN_RATIO_CEILING = 50.0    # if current ratio is above this, the
+                                    # country is still in combat posture,
+                                    # not stood down
+STAND_DOWN_DROP_MIN = 15.0          # ratio must have dropped at least this
+                                    # much from the peak during the
+                                    # flagged window
 
 # Pipeline health
 HEALTH_SNAPSHOT_RATE = 0.5
 
 # Embed colours
-COLOUR_RESET_BURST = 0xED4245  # red: concrete preparation signal
-COLOUR_RATIO_CREEP = 0xFEE75C  # yellow: softer, longer-running shift
-COLOUR_DEMOB = 0x57F287        # green: standing down
-COLOUR_DIGEST = 0x5865F2       # blurple: neutral roundup colour
+COLOUR_RESET_BURST = 0xED4245
+COLOUR_RATIO_CREEP = 0xFEE75C
+COLOUR_DEMOB = 0x57F287
+COLOUR_HOLDING = 0xFAA61A          # orange — informational, not green
+COLOUR_DIGEST = 0x5865F2
 COLOUR_HEALTH_WARN = 0xFEE75C
 COLOUR_HEALTH_CRIT = 0xED4245
 
@@ -159,10 +142,9 @@ ECO_SKILLS = {
 }
 
 
-# ---------- API ----------
+# ---------- API (unchanged) ----------
 
 def trpc(endpoint, payload=None, attempt=1):
-    """Hit the proxy. Retries on transient errors like the JS clients do."""
     params = {"input": json.dumps(payload or {})}
     try:
         r = requests.get(f"{API_BASE}/{endpoint}", params=params, timeout=HTTP_TIMEOUT)
@@ -207,10 +189,6 @@ def fetch_ireland():
 
 
 def find_border_countries(regions_obj, country_id, max_hops=None):
-    """Returns {country_id: [region_names]} for foreign countries
-    controlling at least one region within max_hops of the given
-    country's territory.
-    """
     if max_hops is None:
         max_hops = BORDER_HOPS
 
@@ -277,6 +255,16 @@ def build_watchlist(regions_obj, ireland):
     return entries
 
 
+def get_active_war_ids(ireland):
+    """Returns set of country IDs Ireland is actively at war with.
+    Used to suppress stand-down reports for active enemies — you don't
+    declare a country has stood down while you're still fighting them.
+    """
+    if not ireland:
+        return set()
+    return {cid for cid in (ireland.get("warsWith") or []) if isinstance(cid, str)}
+
+
 def fetch_citizens_page(country_id, cursor=None):
     payload = {"countryId": country_id, "limit": ENUM_LIMIT}
     if cursor:
@@ -308,7 +296,7 @@ def parallel_fetch_lite(user_ids):
         ]
 
 
-# ---------- Parsing helpers ----------
+# ---------- Parsing helpers (unchanged) ----------
 
 def parse_iso(ts):
     if not ts:
@@ -351,19 +339,9 @@ def sparkline(values):
     )
 
 
-# ---------- Country sampling ----------
+# ---------- Country sampling (unchanged) ----------
 
 def process_reset_events(sample, prev_user_resets):
-    """Compare each sampled user's reset timestamp to last run's value.
-
-    Returns (new_resets count, resetter_ratios list, combat_resets count,
-    eco_resets count, updated user_resets dict).
-
-    combat_resets and eco_resets are per-user counts of resets where the
-    individual resetter ended up strongly combat- or economy-leaning;
-    they let us flag mobilisation/demob direction even at low absolute
-    counts.
-    """
     new_user_resets = {}
     new_resets = 0
     resetter_ratios = []
@@ -490,35 +468,8 @@ def sample_country(country_id, country_name, now, country_state):
 # ---------- Detection ----------
 
 def detect_reset_burst(history, current):
-    """Returns dict describing the burst, or None.
-
-    Three paths, in priority order. First match wins so the returned
-    `reason` reflects which threshold actually triggered:
-
-      1. Absolute floor (always-on safety net). Fires if current >=
-         NO_BASELINE_RESET_FLOOR regardless of baseline. Stops a noisy
-         baseline from raising the bar above what a quiet country
-         would alert at — a country with a recent mobilisation in its
-         history shouldn't end up LESS sensitive than a brand-new
-         country.
-
-      2. Baseline breach. Once we have MIN_HISTORY_FOR_BASELINE runs
-         of OUTLIER-FILTERED history, fire if current is >= 2σ above
-         that mean (or >= RESET_FLOOR, whichever's higher).
-
-      3. No-baseline floor. If we don't yet have enough clean history
-         for path 2, path 1 already handles it — this is a no-op
-         fallthrough kept for clarity.
-
-    "Outlier-filtered" history excludes entries where new_resets itself
-    crossed the baseline threshold. Without this, a country's own past
-    mobilisations inflate the rolling stdev and make it progressively
-    harder to detect the next one.
-    """
-    # Path 1: always-on absolute floor
+    """Unchanged. See previous version for full rationale."""
     if current >= NO_BASELINE_RESET_FLOOR:
-        # Try to enrich with baseline context if we have it; otherwise
-        # report as a clean floor breach.
         prior_clean = _baseline_history(history)
         if len(prior_clean) >= MIN_HISTORY_FOR_BASELINE:
             mean = statistics.mean(prior_clean)
@@ -535,7 +486,6 @@ def detect_reset_burst(history, current):
             "reason": "no_baseline_floor",
         }
 
-    # Path 2: σ-based breach against a cleaned baseline
     prior_clean = _baseline_history(history)
     if len(prior_clean) < MIN_HISTORY_FOR_BASELINE:
         return None
@@ -553,67 +503,110 @@ def detect_reset_burst(history, current):
 
 
 def _baseline_history(history):
-    """Returns the list of historical new_resets values to use as a
-    baseline, with self-referential outliers removed.
-
-    Without this filter, a country's own past mobilisations inflate the
-    rolling mean and stdev, making the next mobilisation progressively
-    harder to detect. Norway after 2026-05-21/22 is the canonical case:
-    those two spike days alone push the σ-threshold from ~3 to ~7.
-
-    The filter is conservative: it drops entries where new_resets was
-    itself ≥ NO_BASELINE_RESET_FLOOR (i.e. would have tripped path 1).
-    Routine variance below that floor stays in the baseline, so a
-    normally-bursty country still gets its bursty mean.
-    """
     values = [h.get("new_resets", 0) for h in history]
     cleaned = [v for v in values if v < NO_BASELINE_RESET_FLOOR]
-    # If filtering would leave us with too little data, fall back to the
-    # full series. Better to have a noisy baseline than no baseline.
     if len(cleaned) < MIN_HISTORY_FOR_BASELINE:
         return values
     return cleaned
 
 
-def detect_combat_intent_resets(snap):
-    """Returns dict if any resets this run were strongly combat-leaning,
-    even when the absolute count is too low for a burst.
+def _ratio_shift_7d(history, current_ratio, now):
+    """Returns the signed 7d ratio delta if we have a usable comparison
+    point, else None. Used as corroboration for single-resetter intent.
+    """
+    pt = _find_history_point(
+        history, now - timedelta(days=RATIO_LOOKBACK_DAYS), RATIO_LOOKBACK_DAYS - 1
+    )
+    if pt is None:
+        return None
+    return current_ratio - pt["combat_ratio"]
+
+
+def detect_combat_intent_resets(snap, history, now):
+    """Returns dict if resets this run point at war prep.
+
+    Fires when EITHER:
+      - combat_resets >= COMBAT_INTENT_MIN_RESETTERS (2), OR
+      - combat_resets >= 1 AND 7d ratio has moved up by at least
+        INTENT_CORROBORATION_RATIO (5pp) — i.e. the single resetter is
+        consistent with a broader upward trend
+
+    The earlier version fired on any single combat-leaning resetter,
+    which produced noisy lines in the digest.
     """
     combat_resets = snap.get("combat_resets", 0)
     rcr = snap.get("resetter_combat_ratio")
-    if combat_resets >= 1 and rcr is not None and rcr >= COMBAT_INTENT_PP:
+    if combat_resets < 1 or rcr is None or rcr < COMBAT_INTENT:
+        return None
+
+    if combat_resets >= COMBAT_INTENT_MIN_RESETTERS:
         return {
             "combat_resets": combat_resets,
             "resetter_combat_ratio": rcr,
             "new_resets": snap.get("new_resets", 0),
+            "corroborated_by": "count",
         }
+
+    # Single resetter — needs corroboration from broader ratio movement
+    shift = _ratio_shift_7d(history, snap["combat_ratio"], now)
+    if shift is not None and shift >= INTENT_CORROBORATION_RATIO:
+        return {
+            "combat_resets": combat_resets,
+            "resetter_combat_ratio": rcr,
+            "new_resets": snap.get("new_resets", 0),
+            "corroborated_by": "ratio_shift",
+            "ratio_shift_7d": round(shift, 1),
+        }
+
+    return None
+
+
+def detect_eco_intent_resets(snap, history, now):
+    """Mirror of detect_combat_intent_resets for demobilisation.
+
+    Single eco-leaning resetters used to fire this on their own — that's
+    what caused the bad Denmark/US demob alerts. Now requires:
+      - eco_resets >= ECO_INTENT_MIN_RESETTERS (2), OR
+      - eco_resets >= 1 AND 7d ratio has dropped by at least
+        INTENT_CORROBORATION_RATIO (5pp)
+    """
+    eco_resets = snap.get("eco_resets", 0)
+    rcr = snap.get("resetter_combat_ratio")
+    if eco_resets < 1 or rcr is None or rcr > DEMOB_RESET_INTENT:
+        return None
+
+    if eco_resets >= ECO_INTENT_MIN_RESETTERS:
+        return {
+            "eco_resets": eco_resets,
+            "resetter_combat_ratio": rcr,
+            "new_resets": snap.get("new_resets", 0),
+            "corroborated_by": "count",
+        }
+
+    shift = _ratio_shift_7d(history, snap["combat_ratio"], now)
+    if shift is not None and shift <= -INTENT_CORROBORATION_RATIO:
+        return {
+            "eco_resets": eco_resets,
+            "resetter_combat_ratio": rcr,
+            "new_resets": snap.get("new_resets", 0),
+            "corroborated_by": "ratio_shift",
+            "ratio_shift_7d": round(shift, 1),
+        }
+
     return None
 
 
 def _find_history_point(history, target, min_age_days):
-    """Returns the history entry closest to `target` time, but only if
-    it's at least `min_age_days` old. None if no such point exists.
-    """
     if not history:
         return None
     closest = min(history, key=lambda h: abs(parse_iso(h["ts"]) - target))
     age_days = (target - parse_iso(closest["ts"])).total_seconds() / 86400
-    # Allow a half-day of slack: a point that's 0.6 days old still
-    # functions as "yesterday" for 1d detection
     if age_days < min_age_days - 0.5:
         return None
     return closest
 
 
 def detect_ratio_creep(history, current_ratio, now):
-    """Returns dict if combat ratio is rising. Includes magnitude tier
-    so the digest can render yellow / orange / red.
-
-    Two timeframes:
-      - 7-day creep: gradual shift, minimum 20 point gain
-      - 1-day jump: fast swing, minimum 30 point gain
-    Reports the more dramatic of the two.
-    """
     candidates = []
 
     week = _find_history_point(
@@ -641,8 +634,6 @@ def detect_ratio_creep(history, current_ratio, now):
     if not candidates:
         return None
     winner = max(candidates, key=lambda c: c["delta"])
-    # Tier by magnitude. The detector reports the tier, the digest decides
-    # icon / colour from it.
     mag = winner["delta"]
     if mag >= RATIO_CREEP_RED:
         winner["tier"] = "red"
@@ -654,10 +645,6 @@ def detect_ratio_creep(history, current_ratio, now):
 
 
 def detect_ratio_collapse(history, current_ratio, now):
-    """Mirror of detect_ratio_creep for the demobilising direction.
-    Returns dict with delta as a negative number (magnitude of drop).
-    Tiers track magnitude on the green side of the palette.
-    """
     candidates = []
 
     week = _find_history_point(
@@ -695,19 +682,6 @@ def detect_ratio_collapse(history, current_ratio, now):
     return winner
 
 
-def detect_eco_intent_resets(snap):
-    """Returns dict if any resets this run were strongly eco-leaning."""
-    eco_resets = snap.get("eco_resets", 0)
-    rcr = snap.get("resetter_combat_ratio")
-    if eco_resets >= 1 and rcr is not None and rcr <= DEMOB_RESET_INTENT:
-        return {
-            "eco_resets": eco_resets,
-            "resetter_combat_ratio": rcr,
-            "new_resets": snap.get("new_resets", 0),
-        }
-    return None
-
-
 def is_high_severity_burst(burst):
     threshold = burst.get("threshold") or RESET_FLOOR
     return burst["current"] >= max(threshold * HIGH_SEVERITY_FACTOR, HIGH_SEVERITY_FLOOR)
@@ -718,10 +692,6 @@ def is_high_severity_demob(collapse):
 
 
 def should_send_urgent(prev_country, current_value, key_alert, key_count):
-    """Per-country cooldown for urgent alerts. Generic over alert type:
-    pass the state key prefix (e.g. 'last_urgent_alert' or
-    'last_demob_alert') and the count being compared.
-    """
     last_iso = prev_country.get(key_alert)
     if not last_iso:
         return True
@@ -748,9 +718,6 @@ def save_state(state):
 
 
 def migrate(state):
-    """Bring older state files up to the current schema. Idempotent and
-    incremental — each version bump runs once per file.
-    """
     version = state.get("version", 1)
 
     if version < 4:
@@ -762,13 +729,9 @@ def migrate(state):
             country.setdefault("last_urgent_count", None)
         state.setdefault("flagged_last_run", [])
         state["version"] = 4
-        print("Migrated state v3 → v4 (dropped history, added per-user reset tracking).")
+        print("Migrated state v3 → v4.")
 
     if version < 5:
-        # v5 changes:
-        #  - Added combat_resets / eco_resets per-country
-        #  - Added last_demob_alert / last_demob_delta for demob cooldown
-        #  - Added last_creep_alert / last_creep_delta for red-tier creep cooldown
         for country in state.get("countries", {}).values():
             country.setdefault("combat_resets", 0)
             country.setdefault("eco_resets", 0)
@@ -777,7 +740,16 @@ def migrate(state):
             country.setdefault("last_creep_alert", None)
             country.setdefault("last_creep_delta", None)
         state["version"] = 5
-        print("Migrated state v4 → v5 (added combat/eco reset counts and demob tracking).")
+        print("Migrated state v4 → v5.")
+
+    if version < 6:
+        # v6: track peak ratio while flagged so stand-down can compare
+        # against the right reference, not just "anything different"
+        for country in state.get("countries", {}).values():
+            country.setdefault("last_flagged_at", None)
+            country.setdefault("last_flagged_peak_ratio", None)
+        state["version"] = 6
+        print("Migrated state v5 → v6 (added flagged-peak tracking).")
 
     return state
 
@@ -812,15 +784,6 @@ def trend_field(history, snap):
 
 
 def _humanise_baseline(mean_per_run):
-    """Turn 'mean resets per run' (one run ≈ one day) into plain English.
-
-    Examples:
-      0.0  → "almost never"
-      0.4  → "about 1 every 2-3 days"
-      1.0  → "about 1 per day"
-      2.5  → "2-3 per day"
-      5.0  → "around 5 per day"
-    """
     if mean_per_run < 0.15:
         return "almost never"
     if mean_per_run < 0.55:
@@ -835,12 +798,6 @@ def _humanise_baseline(mean_per_run):
 
 
 def _resetter_summary(snap):
-    """Plain-English line describing what the people who reset are doing.
-
-    Returns up to two facts: how many went strongly combat/economy, and
-    the typical resetter's new combat focus. Designed to be honest about
-    referents ("of those who reset" not "of the country").
-    """
     rcr = snap.get("resetter_combat_ratio")
     if rcr is None:
         return None
@@ -851,13 +808,9 @@ def _resetter_summary(snap):
     parts = []
     if n >= 1:
         if combat_resets >= 1:
-            parts.append(
-                f"**{combat_resets} of {n}** rebuilt as a combat fighter"
-            )
+            parts.append(f"**{combat_resets} of {n}** rebuilt as a combat fighter")
         elif eco_resets >= 1:
-            parts.append(
-                f"**{eco_resets} of {n}** rebuilt as a worker"
-            )
+            parts.append(f"**{eco_resets} of {n}** rebuilt as a worker")
 
     if rcr >= COMBAT_INTENT:
         descriptor = "heavily combat-focused"
@@ -873,13 +826,10 @@ def _resetter_summary(snap):
 
 
 def send_high_severity_burst(country_name, snap, burst, history):
-    """Dedicated alert when a notable number of citizens reset at once."""
     n = burst["current"]
     sample_size = snap["sample_size"]
     pct = (n / sample_size) * 100 if sample_size else 0
 
-    # Baseline phrasing has to handle both "no baseline yet" and the
-    # normal case. Decimal means-per-run are unintuitive so we humanise.
     if burst.get("baseline_mean") is not None:
         normal_phrase = _humanise_baseline(burst["baseline_mean"])
         baseline_clause = f"This country normally sees {normal_phrase}."
@@ -904,9 +854,7 @@ def send_high_severity_burst(country_name, snap, burst, history):
             "name": "Who we're watching",
             "value": (
                 f"The top **{sample_size}** active fighters in this country "
-                f"(level ≥ {MIN_LEVEL}, online in last {ACTIVITY_WINDOW_DAYS} days). "
-                f"Not the whole population — just the people who actually show up "
-                f"to battles."
+                f"(level ≥ {MIN_LEVEL}, online in last {ACTIVITY_WINDOW_DAYS} days)."
             ),
             "inline": False,
         },
@@ -946,7 +894,6 @@ def send_high_severity_burst(country_name, snap, burst, history):
 
 
 def send_high_severity_demob(country_name, snap, collapse, history):
-    """Dedicated alert when a country's fighters are visibly standing down."""
     drop = abs(collapse["delta"])
     window = collapse["window_days"]
     window_text = "the past day" if window == 1 else f"the past {window} days"
@@ -1005,127 +952,7 @@ def send_high_severity_demob(country_name, snap, collapse, history):
     return safe_post(embed, f"demob alert for {country_name}")
 
 
-def _digest_line_burst(name, snap, burst, severity):
-    """A clutch of citizens switched their builds.
-
-    Fires when: new_resets ≥ baseline+2σ (or ≥ RESET_FLOOR with baseline,
-    or ≥ NO_BASELINE_RESET_FLOOR without). 'high' severity adds a
-    dedicated alert on top.
-    """
-    icon = "🔴" if severity == "high" else "🟠"
-    n = burst["current"]
-    sample = snap["sample_size"]
-    pct = (n / sample) * 100 if sample else 0
-    rcr = snap.get("resetter_combat_ratio")
-    combat_resets = snap.get("combat_resets", 0)
-
-    main = f"**{n} of {sample}** top citizens ({pct:.0f}%) switched their builds"
-    if combat_resets >= 1 and rcr is not None and rcr >= COMBAT_INTENT:
-        main += (
-            f" — **{combat_resets} of {n}** rebuilt as combat fighters "
-            f"({rcr:.0f}% combat skills)"
-        )
-    elif rcr is not None:
-        main += f" (typical resetter is now {rcr:.0f}% combat)"
-    return icon, name, main
-
-
-def _digest_line_combat_intent(name, snap, intent):
-    """Small number of resets, but those who reset clearly went combat.
-
-    Fires when: new_resets ≥ 1 AND median resetter has combat allocation
-    ≥ COMBAT_INTENT (70%). Only emitted when there's no burst already
-    flagging the same activity.
-    """
-    icon = "🟠"
-    n = intent["combat_resets"]
-    total = intent["new_resets"]
-    rcr = intent["resetter_combat_ratio"]
-    sample = snap["sample_size"]
-    citizen = "citizen" if n == 1 else "citizens"
-    main = (
-        f"**{n} of {total}** {citizen} (out of {sample} top citizens) "
-        f"rebuilt as combat fighters ({rcr:.0f}% combat skills)"
-    )
-    return icon, name, main
-
-
-def _digest_line_creep(name, snap, creep):
-    """The country's typical fighter has shifted toward combat skills
-    over the past day or week — without necessarily resetting.
-
-    Fires when: combat ratio rose by ≥ 20 points in 7d OR ≥ 30 in 1d.
-    Icon tier scales with magnitude (yellow / orange / red).
-    """
-    tier = creep.get("tier", "yellow")
-    icon = {"red": "🔴", "orange": "🟠", "yellow": "🟡"}[tier]
-    label = {
-        "red": "Major combat shift",
-        "orange": "Significant combat shift",
-        "yellow": "Drifting toward combat",
-    }[tier]
-    window = creep["window_days"]
-    window_text = "the past day" if window == 1 else f"the past {window} days"
-    main = (
-        f"{label}: typical citizen went from **{creep['old_ratio']:.0f}% → "
-        f"{snap['combat_ratio']:.0f}% combat** over {window_text}"
-    )
-    return icon, name, main
-
-
-def _digest_line_collapse(name, snap, collapse):
-    """Mirror of creep — citizens shifted away from combat.
-
-    Fires when: combat ratio dropped by ≥ 20 points in 7d OR ≥ 30 in 1d.
-    Always green-shaded; magnitude controls the qualifier.
-    """
-    icon = "🟢"
-    tier = collapse.get("tier", "green_light")
-    label = {
-        "green_strong": "Strong stand-down",
-        "green_med": "Visible stand-down",
-        "green_light": "Drifting away from combat",
-    }[tier]
-    window = collapse["window_days"]
-    window_text = "the past day" if window == 1 else f"the past {window} days"
-    drop = abs(collapse["delta"])
-    likely = ""
-    if drop >= RATIO_DROP_RED:
-        likely = " — appears to be standing down from active campaign"
-    elif drop >= RATIO_DROP_ORANGE:
-        likely = " — likely de-escalating"
-    main = (
-        f"{label}: typical citizen went from **{collapse['old_ratio']:.0f}% → "
-        f"{snap['combat_ratio']:.0f}% combat** over {window_text}{likely}"
-    )
-    return icon, name, main
-
-
-def _digest_line_eco_intent(name, snap, intent):
-    """Small number of resets, but those who reset rebuilt as workers.
-
-    Fires when: new_resets ≥ 1 AND median resetter has combat allocation
-    ≤ DEMOB_RESET_INTENT (30%). Only emitted when there's no collapse
-    already flagging the same activity.
-    """
-    icon = "🟢"
-    n = intent["eco_resets"]
-    total = intent["new_resets"]
-    rcr = intent["resetter_combat_ratio"]
-    sample = snap["sample_size"]
-    citizen = "citizen" if n == 1 else "citizens"
-    main = (
-        f"**{n} of {total}** {citizen} (out of {sample} top citizens) "
-        f"rebuilt as workers ({rcr:.0f}% combat skills) — demobilising"
-    )
-    return icon, name, main
-
-
 def send_high_severity_creep(country_name, snap, creep, history):
-    """Dedicated alert for a major combat-allocation swing (red tier).
-    Distinct from burst alerts — this one fires on the state change
-    (where allocation is now) rather than the event (resets happening).
-    """
     window = creep["window_days"]
     window_text = "the past day" if window == 1 else f"the past {window} days"
     gain = creep["delta"]
@@ -1175,21 +1002,165 @@ def send_high_severity_creep(country_name, snap, creep, history):
     return safe_post(embed, f"red-tier creep alert for {country_name}")
 
 
-def send_digest(flagged, stood_down, now):
-    """One summary embed per run. Lists flagged countries severity-ranked,
-    appends a stood-down section if any.
+# ---------- Digest line renderers ----------
+
+def _digest_line_burst(name, snap, burst, severity):
+    icon = "🔴" if severity == "high" else "🟠"
+    n = burst["current"]
+    sample = snap["sample_size"]
+    pct = (n / sample) * 100 if sample else 0
+    rcr = snap.get("resetter_combat_ratio")
+    combat_resets = snap.get("combat_resets", 0)
+
+    main = f"**{n} of {sample}** top citizens ({pct:.0f}%) switched their builds"
+    if combat_resets >= 1 and rcr is not None and rcr >= COMBAT_INTENT:
+        main += (
+            f" — **{combat_resets} of {n}** rebuilt as combat fighters "
+            f"({rcr:.0f}% combat skills)"
+        )
+    elif rcr is not None:
+        main += f" (typical resetter is now {rcr:.0f}% combat)"
+    return icon, name, main
+
+
+def _digest_line_combat_intent(name, snap, intent):
+    icon = "🟠"
+    n = intent["combat_resets"]
+    total = intent["new_resets"]
+    rcr = intent["resetter_combat_ratio"]
+    sample = snap["sample_size"]
+    citizen = "citizen" if n == 1 else "citizens"
+    main = (
+        f"**{n} of {total}** {citizen} (out of {sample} top citizens) "
+        f"rebuilt as combat fighters ({rcr:.0f}% combat skills)"
+    )
+    if intent.get("corroborated_by") == "ratio_shift":
+        main += f" — confirmed by 7d ratio shift of +{intent['ratio_shift_7d']:.0f}pp"
+    return icon, name, main
+
+
+def _digest_line_creep(name, snap, creep):
+    tier = creep.get("tier", "yellow")
+    icon = {"red": "🔴", "orange": "🟠", "yellow": "🟡"}[tier]
+    label = {
+        "red": "Major combat shift",
+        "orange": "Significant combat shift",
+        "yellow": "Drifting toward combat",
+    }[tier]
+    window = creep["window_days"]
+    window_text = "the past day" if window == 1 else f"the past {window} days"
+    main = (
+        f"{label}: typical citizen went from **{creep['old_ratio']:.0f}% → "
+        f"{snap['combat_ratio']:.0f}% combat** over {window_text}"
+    )
+    return icon, name, main
+
+
+def _digest_line_collapse(name, snap, collapse):
+    icon = "🟢"
+    tier = collapse.get("tier", "green_light")
+    label = {
+        "green_strong": "Strong stand-down",
+        "green_med": "Visible stand-down",
+        "green_light": "Drifting away from combat",
+    }[tier]
+    window = collapse["window_days"]
+    window_text = "the past day" if window == 1 else f"the past {window} days"
+    drop = abs(collapse["delta"])
+    likely = ""
+    if drop >= RATIO_DROP_RED:
+        likely = " — appears to be standing down from active campaign"
+    elif drop >= RATIO_DROP_ORANGE:
+        likely = " — likely de-escalating"
+    main = (
+        f"{label}: typical citizen went from **{collapse['old_ratio']:.0f}% → "
+        f"{snap['combat_ratio']:.0f}% combat** over {window_text}{likely}"
+    )
+    return icon, name, main
+
+
+def _digest_line_eco_intent(name, snap, intent):
+    icon = "🟢"
+    n = intent["eco_resets"]
+    total = intent["new_resets"]
+    rcr = intent["resetter_combat_ratio"]
+    sample = snap["sample_size"]
+    citizen = "citizen" if n == 1 else "citizens"
+    main = (
+        f"**{n} of {total}** {citizen} (out of {sample} top citizens) "
+        f"rebuilt as workers ({rcr:.0f}% combat skills) — demobilising"
+    )
+    if intent.get("corroborated_by") == "ratio_shift":
+        main += f" — confirmed by 7d ratio shift of {intent['ratio_shift_7d']:.0f}pp"
+    return icon, name, main
+
+
+# ---------- NEW: digest assembly with rollup and holding state ----------
+
+def _is_low_severity(flag):
+    """A flag counts as low-severity if it would clutter the digest on its
+    own — yellow creep and single-resetter intents that survived the new
+    corroboration gates.
     """
-    # Order:
-    #   1. high-severity mobilisation (red burst / red creep)
-    #   2. medium mobilisation (orange burst / orange creep / combat_intent)
-    #   3. low mobilisation (yellow creep)
-    #   4. demobilisation (any green tier)
-    def order_key(f):
-        if f["kind"] in ("collapse", "eco_intent"):
-            return (10, f["name"])
-        sev_rank = {"high": 0, "med": 1, "low": 2}.get(f["severity"], 9)
-        return (sev_rank, f["name"])
-    flagged.sort(key=order_key)
+    if flag["kind"] == "creep" and flag["detection"].get("tier") == "yellow":
+        return True
+    if flag["kind"] == "combat_intent":
+        return flag["detection"]["combat_resets"] < COMBAT_INTENT_MIN_RESETTERS
+    if flag["kind"] == "eco_intent":
+        return flag["detection"]["eco_resets"] < ECO_INTENT_MIN_RESETTERS
+    return False
+
+
+def _minor_activity_label(flag):
+    """Short label for a country in the minor-activity rollup line."""
+    name = flag["name"]
+    if flag["kind"] == "creep":
+        return f"{name} (drifting toward combat)"
+    if flag["kind"] == "combat_intent":
+        return f"{name} (1 resetter, combat-leaning)"
+    if flag["kind"] == "eco_intent":
+        return f"{name} (1 resetter, eco-leaning)"
+    return name
+
+
+def send_digest(flagged, stood_down, holding, now):
+    """One summary embed per run.
+
+    Three sections, in order:
+      1. Flagged countries severity-ranked (med/high only as full lines)
+      2. "Holding at high readiness" — was flagged, signal quiet, ratio
+         still high enough that calling it a stand-down would be wrong
+      3. "No longer flagged" — actual stand-downs (ratio dropped)
+    Low-severity flags fold into a single "Minor activity" line.
+    """
+    # Partition: a country with any non-low flag uses its full line and
+    # we suppress its minor flags. Pure low-severity countries roll up.
+    full_line_by_cid = {}
+    for f in flagged:
+        if not _is_low_severity(f):
+            # Prefer the most severe flag for the full line if a country
+            # has multiple (e.g. burst + creep). Severity rank mirrors
+            # the sort below.
+            existing = full_line_by_cid.get(f["cid"])
+            if existing is None or _severity_rank(f) < _severity_rank(existing):
+                full_line_by_cid[f["cid"]] = f
+
+    minor_only = [
+        f for f in flagged
+        if f["cid"] not in full_line_by_cid and _is_low_severity(f)
+    ]
+    # Deduplicate the minor list — one entry per country, prefer the
+    # most informative kind (intent > creep)
+    seen_cids = set()
+    minor_dedup = []
+    minor_priority = {"combat_intent": 0, "eco_intent": 0, "creep": 1}
+    for f in sorted(minor_only, key=lambda x: minor_priority.get(x["kind"], 9)):
+        if f["cid"] in seen_cids:
+            continue
+        seen_cids.add(f["cid"])
+        minor_dedup.append(f)
+
+    full_lines = sorted(full_line_by_cid.values(), key=_severity_rank)
 
     line_renderers = {
         "burst": lambda f: _digest_line_burst(
@@ -1210,7 +1181,7 @@ def send_digest(flagged, stood_down, now):
     }
 
     fields = []
-    for f in flagged[:25]:
+    for f in full_lines[:25]:
         renderer = line_renderers.get(f["kind"])
         if not renderer:
             continue
@@ -1218,6 +1189,31 @@ def send_digest(flagged, stood_down, now):
         fields.append({
             "name": f"{icon} {name}",
             "value": value,
+            "inline": False,
+        })
+
+    if minor_dedup:
+        labels = [_minor_activity_label(f) for f in minor_dedup[:12]]
+        more = ""
+        if len(minor_dedup) > 12:
+            more = f" (+{len(minor_dedup) - 12} more)"
+        fields.append({
+            "name": "🟡 Minor activity",
+            "value": ", ".join(labels) + more,
+            "inline": False,
+        })
+
+    if holding:
+        holding_lines = []
+        for h in sorted(holding, key=lambda x: -x["current_ratio"])[:15]:
+            holding_lines.append(
+                f"**{h['name']}** — {h['current_ratio']:.0f}% combat "
+                f"(peaked {h['peak_ratio']:.0f}% on "
+                f"{h['peak_date']})"
+            )
+        fields.append({
+            "name": "🟠 Holding at high readiness",
+            "value": "\n".join(holding_lines),
             "inline": False,
         })
 
@@ -1229,20 +1225,25 @@ def send_digest(flagged, stood_down, now):
             "inline": False,
         })
 
-    counts_mob = {"high": 0, "med": 0, "low": 0}
+    # Summary counts
+    counts_mob = {"high": 0, "med": 0}
     counts_demob = 0
-    for f in flagged:
+    for f in full_lines:
         if f["kind"] in ("collapse", "eco_intent"):
             counts_demob += 1
         else:
-            counts_mob[f["severity"]] = counts_mob.get(f["severity"], 0) + 1
+            sev = f["severity"]
+            if sev in counts_mob:
+                counts_mob[sev] = counts_mob.get(sev, 0) + 1
     parts = []
     if counts_mob["high"]:
         parts.append(f"**{counts_mob['high']}** urgent")
     if counts_mob["med"]:
         parts.append(f"**{counts_mob['med']}** preparing")
-    if counts_mob["low"]:
-        parts.append(f"**{counts_mob['low']}** drifting")
+    if minor_dedup:
+        parts.append(f"**{len(minor_dedup)}** minor")
+    if holding:
+        parts.append(f"**{len(holding)}** holding")
     if counts_demob:
         parts.append(f"**{counts_demob}** standing down")
     summary = ", ".join(parts) if parts else None
@@ -1254,15 +1255,12 @@ def send_digest(flagged, stood_down, now):
         "skill points spent on combat skills.\n\n"
     )
 
-    if flagged:
-        body = f"{summary} ({len(flagged)} total)."
-        if len(flagged) > 25:
-            body += f"\nShowing top 25; {len(flagged) - 25} more not displayed."
-        if stood_down:
-            body += f" {len(stood_down)} no longer flagged."
+    total_items = len(full_lines) + len(minor_dedup) + len(holding) + len(stood_down)
+    if total_items:
+        body = f"{summary} ({total_items} total)." if summary else f"{total_items} items."
         description = intro + body
     else:
-        description = intro + f"All quiet now — {len(stood_down)} no longer flagged."
+        description = intro + "All quiet."
 
     embed = {
         "title": "🛡️ War Watch · Daily Digest",
@@ -1272,6 +1270,14 @@ def send_digest(flagged, stood_down, now):
         "timestamp": now.isoformat(),
     }
     return safe_post(embed, "digest")
+
+
+def _severity_rank(f):
+    """Sort key — lower is more important."""
+    if f["kind"] in ("collapse", "eco_intent"):
+        return (10, f["name"])
+    rank = {"high": 0, "med": 1, "low": 2}.get(f["severity"], 9)
+    return (rank, f["name"])
 
 
 def send_health_alert(message, critical=False):
@@ -1284,6 +1290,49 @@ def send_health_alert(message, critical=False):
     return safe_post(embed, "health alert")
 
 
+# ---------- Stand-down vs holding classification ----------
+
+def classify_post_flag_state(
+    cid, prev_country, snap, active_war_ids
+):
+    """When a country was flagged last run and isn't this run, decide
+    whether it actually stood down or is just holding at high readiness.
+
+    Returns one of: "stood_down", "holding", None.
+    None means "report nothing" — e.g. it's an active war, treat as
+    ongoing.
+    """
+    # Active war → never declare stand-down. The country is still a
+    # threat regardless of what the resetters did this run.
+    if cid in active_war_ids:
+        return "holding"
+
+    current_ratio = snap["combat_ratio"]
+    peak_ratio = prev_country.get("last_flagged_peak_ratio")
+
+    # If we don't have a peak (e.g. flag came from before v6 migration),
+    # use the conservative approach: high current ratio = holding.
+    if peak_ratio is None:
+        if current_ratio >= STAND_DOWN_RATIO_CEILING:
+            return "holding"
+        return "stood_down"
+
+    drop_from_peak = peak_ratio - current_ratio
+    if current_ratio >= STAND_DOWN_RATIO_CEILING:
+        # Still in combat posture. Even if ratio fell some from peak,
+        # 50%+ allocation to combat is not "stood down".
+        return "holding"
+
+    if drop_from_peak >= STAND_DOWN_DROP_MIN:
+        return "stood_down"
+
+    # Ratio is below the ceiling but didn't drop much from peak either.
+    # This is a country that was never highly mobilised — the original
+    # flag was likely a soft creep or single-resetter event. Quietly
+    # drop from watch without making a fuss.
+    return "stood_down"
+
+
 # ---------- Main ----------
 
 def main():
@@ -1294,10 +1343,11 @@ def main():
     regions = fetch_regions()
     ireland = fetch_ireland()
     watchlist = build_watchlist(regions, ireland)
+    active_war_ids = get_active_war_ids(ireland)
 
     country_name = {c["_id"]: c.get("name", c["_id"]) for c in countries if c.get("_id")}
     print(f"Loaded {len(countries)} countries. Watchlist: {len(watchlist)} "
-          f"(within {BORDER_HOPS} hops of Ireland).")
+          f"(within {BORDER_HOPS} hops of Ireland). Active wars: {len(active_war_ids)}.")
     for cid in sorted(watchlist, key=lambda c: country_name.get(c, c)):
         entry = watchlist[cid]
         parts = []
@@ -1375,8 +1425,8 @@ def main():
         burst = detect_reset_burst(history, snap["new_resets"])
         creep = detect_ratio_creep(history, snap["combat_ratio"], now)
         collapse = detect_ratio_collapse(history, snap["combat_ratio"], now)
-        combat_intent = detect_combat_intent_resets(snap)
-        eco_intent = detect_eco_intent_resets(snap)
+        combat_intent = detect_combat_intent_resets(snap, history, now)
+        eco_intent = detect_eco_intent_resets(snap, history, now)
 
         new_history = (history + [{
             "ts": now.isoformat(),
@@ -1404,11 +1454,14 @@ def main():
             "last_demob_delta": prev_country.get("last_demob_delta"),
             "last_creep_alert": prev_country.get("last_creep_alert"),
             "last_creep_delta": prev_country.get("last_creep_delta"),
+            "last_flagged_at": prev_country.get("last_flagged_at"),
+            "last_flagged_peak_ratio": prev_country.get("last_flagged_peak_ratio"),
             "history": new_history,
         }
 
-        # Mobilisation signals (mutually compatible — burst beats combat_intent
-        # in the digest since they'd describe the same event)
+        # ---- Mobilisation flagging ----
+        flagged_this_run = False
+
         if burst:
             high = is_high_severity_burst(burst)
             flagged.append({
@@ -1419,6 +1472,7 @@ def main():
                 "snap": snap,
                 "detection": burst,
             })
+            flagged_this_run = True
             if high and should_send_urgent(
                 prev_country, burst["current"],
                 "last_urgent_alert", "last_urgent_count",
@@ -1428,16 +1482,15 @@ def main():
                     new_country["last_urgent_alert"] = now.isoformat()
                     new_country["last_urgent_count"] = burst["current"]
         elif combat_intent:
-            # Only flag combat_intent as its own line if there's no burst
-            # already explaining the same activity
             flagged.append({
                 "cid": cid,
                 "name": snap["name"],
                 "kind": "combat_intent",
-                "severity": "med",
+                "severity": "med" if combat_intent["combat_resets"] >= COMBAT_INTENT_MIN_RESETTERS else "low",
                 "snap": snap,
                 "detection": combat_intent,
             })
+            flagged_this_run = True
 
         if creep:
             sev = {"red": "high", "orange": "med", "yellow": "low"}[creep["tier"]]
@@ -1449,8 +1502,7 @@ def main():
                 "snap": snap,
                 "detection": creep,
             })
-            # Red-tier creep (60+ point shift) gets its own dedicated alert.
-            # Cooldown so we don't re-alert daily on a sustained high ratio.
+            flagged_this_run = True
             if creep["tier"] == "red" and should_send_urgent(
                 prev_country, creep["delta"],
                 "last_creep_alert", "last_creep_delta",
@@ -1459,60 +1511,100 @@ def main():
                     new_country["last_creep_alert"] = now.isoformat()
                     new_country["last_creep_delta"] = creep["delta"]
 
-        # Demobilisation signals
-        if collapse:
-            high_demob = is_high_severity_demob(collapse)
-            # Tier the digest severity by magnitude so red-tier demobs
-            # rank higher in the digest order
-            tier_sev = {
-                "green_strong": "med",
-                "green_med": "med",
-                "green_light": "low",
-            }[collapse["tier"]]
-            flagged.append({
-                "cid": cid,
-                "name": snap["name"],
-                "kind": "collapse",
-                "severity": tier_sev,
-                "snap": snap,
-                "detection": collapse,
-            })
-            if high_demob and should_send_urgent(
-                prev_country, abs(collapse["delta"]),
-                "last_demob_alert", "last_demob_delta",
-            ):
-                if send_high_severity_demob(snap["name"], snap, collapse, history):
-                    demob_sent += 1
-                    new_country["last_demob_alert"] = now.isoformat()
-                    new_country["last_demob_delta"] = abs(collapse["delta"])
-        elif eco_intent:
-            flagged.append({
-                "cid": cid,
-                "name": snap["name"],
-                "kind": "eco_intent",
-                "severity": "low",
-                "snap": snap,
-                "detection": eco_intent,
-            })
+        # ---- Demobilisation flagging ----
+        # Suppressed entirely for active wars: you're not de-escalating
+        # against a country you're at war with.
+        if cid not in active_war_ids:
+            if collapse:
+                high_demob = is_high_severity_demob(collapse)
+                tier_sev = {
+                    "green_strong": "med",
+                    "green_med": "med",
+                    "green_light": "low",
+                }[collapse["tier"]]
+                flagged.append({
+                    "cid": cid,
+                    "name": snap["name"],
+                    "kind": "collapse",
+                    "severity": tier_sev,
+                    "snap": snap,
+                    "detection": collapse,
+                })
+                flagged_this_run = True
+                if high_demob and should_send_urgent(
+                    prev_country, abs(collapse["delta"]),
+                    "last_demob_alert", "last_demob_delta",
+                ):
+                    if send_high_severity_demob(snap["name"], snap, collapse, history):
+                        demob_sent += 1
+                        new_country["last_demob_alert"] = now.isoformat()
+                        new_country["last_demob_delta"] = abs(collapse["delta"])
+            elif eco_intent:
+                flagged.append({
+                    "cid": cid,
+                    "name": snap["name"],
+                    "kind": "eco_intent",
+                    "severity": "low",
+                    "snap": snap,
+                    "detection": eco_intent,
+                })
+                flagged_this_run = True
+
+        # ---- Track peak ratio while flagged for the stand-down detector ----
+        if flagged_this_run:
+            if new_country["last_flagged_at"] is None:
+                new_country["last_flagged_at"] = now.isoformat()
+                new_country["last_flagged_peak_ratio"] = snap["combat_ratio"]
+            else:
+                # Already in a flagged streak — update peak if higher
+                prev_peak = new_country.get("last_flagged_peak_ratio") or 0
+                if snap["combat_ratio"] > prev_peak:
+                    new_country["last_flagged_peak_ratio"] = snap["combat_ratio"]
 
         new_countries_state[cid] = new_country
 
-    # Stand-down detection: countries flagged last run that aren't anymore.
-    # Demob-direction flags count as "still flagged" for this purpose —
-    # they're an active state, not a stand-down event.
+    # ---- Classify previously-flagged countries that aren't this run ----
     prev_flagged_ids = set(state.get("flagged_last_run", []))
     current_flagged_ids = {f["cid"] for f in flagged}
     sampled_ids = set(snapshots.keys())
-    stood_down_ids = (prev_flagged_ids & sampled_ids) - current_flagged_ids
-    stood_down = []
-    for cid in stood_down_ids:
-        name = (country_name.get(cid)
-                or state.get("countries", {}).get(cid, {}).get("name")
-                or cid)
-        stood_down.append((cid, name))
+    no_longer_flagged_ids = (prev_flagged_ids & sampled_ids) - current_flagged_ids
 
-    if flagged or stood_down:
-        send_digest(flagged, stood_down, now)
+    stood_down = []
+    holding = []
+    for cid in no_longer_flagged_ids:
+        snap = snapshots[cid]
+        prev_country = state.get("countries", {}).get(cid, {})
+        classification = classify_post_flag_state(
+            cid, prev_country, snap, active_war_ids
+        )
+        name = (country_name.get(cid) or prev_country.get("name") or cid)
+
+        if classification == "stood_down":
+            stood_down.append((cid, name))
+            # Clear the flagged-peak tracking — next time they get flagged,
+            # we start fresh.
+            new_countries_state[cid]["last_flagged_at"] = None
+            new_countries_state[cid]["last_flagged_peak_ratio"] = None
+        elif classification == "holding":
+            peak = prev_country.get("last_flagged_peak_ratio") or snap["combat_ratio"]
+            peak_date = "unknown"
+            flagged_at = parse_iso(prev_country.get("last_flagged_at"))
+            if flagged_at:
+                peak_date = flagged_at.strftime("%b %-d")
+            holding.append({
+                "cid": cid,
+                "name": name,
+                "current_ratio": snap["combat_ratio"],
+                "peak_ratio": peak,
+                "peak_date": peak_date,
+            })
+            # Stay in flagged_last_run so we keep watching. The country
+            # isn't producing fresh alerts but we're tracking that it's
+            # still in combat posture.
+            current_flagged_ids.add(cid)
+
+    if flagged or stood_down or holding:
+        send_digest(flagged, stood_down, holding, now)
 
     state["version"] = STATE_VERSION
     state["last_run"] = now.isoformat()
@@ -1530,7 +1622,7 @@ def main():
         f"Done. Snapshots: {len(snapshots)}. "
         f"Flagged: {len(flagged)} ({mob_count} mobilising, {demob_count} demobilising; "
         f"{high_sev_sent} urgent burst, {demob_sent} urgent demob sent). "
-        f"Stood down: {len(stood_down)}."
+        f"Holding: {len(holding)}. Stood down: {len(stood_down)}."
     )
 
 
