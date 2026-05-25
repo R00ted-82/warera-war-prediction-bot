@@ -488,25 +488,55 @@ def sample_country(country_id, country_name, now, country_state):
 def detect_reset_burst(history, current):
     """Returns dict describing the burst, or None.
 
-    Two paths:
-      1. Baseline available (>=5 runs of history): fire if current is
-         >=2σ above mean, OR >= RESET_FLOOR.
-      2. No baseline yet: fire if current >= NO_BASELINE_RESET_FLOOR.
-         This catches obvious mobilisations during the warm-up window
-         that the old code would silently swallow.
+    Three paths, in priority order. First match wins so the returned
+    `reason` reflects which threshold actually triggered:
+
+      1. Absolute floor (always-on safety net). Fires if current >=
+         NO_BASELINE_RESET_FLOOR regardless of baseline. Stops a noisy
+         baseline from raising the bar above what a quiet country
+         would alert at — a country with a recent mobilisation in its
+         history shouldn't end up LESS sensitive than a brand-new
+         country.
+
+      2. Baseline breach. Once we have MIN_HISTORY_FOR_BASELINE runs
+         of OUTLIER-FILTERED history, fire if current is >= 2σ above
+         that mean (or >= RESET_FLOOR, whichever's higher).
+
+      3. No-baseline floor. If we don't yet have enough clean history
+         for path 2, path 1 already handles it — this is a no-op
+         fallthrough kept for clarity.
+
+    "Outlier-filtered" history excludes entries where new_resets itself
+    crossed the baseline threshold. Without this, a country's own past
+    mobilisations inflate the rolling stdev and make it progressively
+    harder to detect the next one.
     """
-    prior = [h.get("new_resets", 0) for h in history]
-    if len(prior) < MIN_HISTORY_FOR_BASELINE:
-        if current >= NO_BASELINE_RESET_FLOOR:
+    # Path 1: always-on absolute floor
+    if current >= NO_BASELINE_RESET_FLOOR:
+        # Try to enrich with baseline context if we have it; otherwise
+        # report as a clean floor breach.
+        prior_clean = _baseline_history(history)
+        if len(prior_clean) >= MIN_HISTORY_FOR_BASELINE:
+            mean = statistics.mean(prior_clean)
             return {
-                "baseline_mean": None,
+                "baseline_mean": round(mean, 1),
                 "threshold": NO_BASELINE_RESET_FLOOR,
                 "current": current,
-                "reason": "no_baseline_floor",
+                "reason": "absolute_floor",
             }
+        return {
+            "baseline_mean": None,
+            "threshold": NO_BASELINE_RESET_FLOOR,
+            "current": current,
+            "reason": "no_baseline_floor",
+        }
+
+    # Path 2: σ-based breach against a cleaned baseline
+    prior_clean = _baseline_history(history)
+    if len(prior_clean) < MIN_HISTORY_FOR_BASELINE:
         return None
-    mean = statistics.mean(prior)
-    stdev = statistics.stdev(prior) if len(prior) > 1 else 0.0
+    mean = statistics.mean(prior_clean)
+    stdev = statistics.stdev(prior_clean) if len(prior_clean) > 1 else 0.0
     threshold = max(mean + BASELINE_SIGMA * stdev, RESET_FLOOR)
     if current >= threshold:
         return {
@@ -516,6 +546,29 @@ def detect_reset_burst(history, current):
             "reason": "baseline_breach",
         }
     return None
+
+
+def _baseline_history(history):
+    """Returns the list of historical new_resets values to use as a
+    baseline, with self-referential outliers removed.
+
+    Without this filter, a country's own past mobilisations inflate the
+    rolling mean and stdev, making the next mobilisation progressively
+    harder to detect. Norway after 2026-05-21/22 is the canonical case:
+    those two spike days alone push the σ-threshold from ~3 to ~7.
+
+    The filter is conservative: it drops entries where new_resets was
+    itself ≥ NO_BASELINE_RESET_FLOOR (i.e. would have tripped path 1).
+    Routine variance below that floor stays in the baseline, so a
+    normally-bursty country still gets its bursty mean.
+    """
+    values = [h.get("new_resets", 0) for h in history]
+    cleaned = [v for v in values if v < NO_BASELINE_RESET_FLOOR]
+    # If filtering would leave us with too little data, fall back to the
+    # full series. Better to have a noisy baseline than no baseline.
+    if len(cleaned) < MIN_HISTORY_FOR_BASELINE:
+        return values
+    return cleaned
 
 
 def detect_combat_intent_resets(snap):
