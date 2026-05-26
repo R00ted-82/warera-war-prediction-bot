@@ -2,8 +2,8 @@
   "countries": {
     "6813b6d446e731854c7ac79a": {
       "combat_ratio": 76.6,
-      "combat_resets": 1,
-      "eco_resets": 1,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 81.4,
@@ -42,34 +42,42 @@
           "new_resets": 2,
           "resetter_combat_ratio": 45.35,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 76.6,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
-        "6849df53fbc59566f93cc7df",
         "68549b4606f40ec9aeb82e11",
+        "6849df53fbc59566f93cc7df",
         "68c71c6108f0a4e094b64cd1",
         "68a217c477dbbe3211da0c87",
         "69033e9c6993cc1212858b2f",
         "6916e072991d93d5d34deedb",
-        "690510343968fc6faf89a856",
         "69036187009657975ceb4e37",
-        "6919c7be99b6f95d037a8087",
+        "690510343968fc6faf89a856",
         "691756e6b6d7886e8cd3bbf3",
-        "690631da4284de8e5e898eff",
-        "69065e23e8e12c3b9ff9f06b",
+        "6919c7be99b6f95d037a8087",
         "6906aa93d65e59eb3ba1a26e",
+        "690631da4284de8e5e898eff",
         "69025adcfe0f15858fead462",
+        "69065e23e8e12c3b9ff9f06b",
         "68fb697597f7a72934bf3bc5",
-        "6902032f582da7f4b18f5902",
         "68fb92ae8831416ea7684f80",
-        "69418fc777214006429fdbbb",
+        "6902032f582da7f4b18f5902",
         "6914918a0b5348273322d176",
+        "69418fc777214006429fdbbb",
         "69064cbcf4d83281b2b9974a",
-        "69035220d2b4a4bcee5f396a",
         "68ff70b2ddd6dbcaaf468fc7",
+        "69035220d2b4a4bcee5f396a",
+        "6945bd36a3e161cb35b91c52",
         "69473a49955d216659cb3dc6",
-        "6945bab3ecf9f19d2f3c17f8",
-        "6945bd36a3e161cb35b91c52"
+        "6945bab3ecf9f19d2f3c17f8"
       ],
       "last_creep_alert": null,
       "last_creep_delta": null,
@@ -81,8 +89,8 @@
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "France",
-      "new_resets": 2,
-      "resetter_combat_ratio": 45.35,
+      "new_resets": 0,
+      "resetter_combat_ratio": null,
       "sample_size": 25,
       "user_resets": {
         "68549b4606f40ec9aeb82e11": "2026-04-29T09:27:11.928Z",
@@ -387,34 +395,42 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 28.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
-        "69b46e1bb052a4f2e20ece7a",
         "69b3c280e86aeacd8ca4a7c5",
-        "69b3b708c5949dae6b26eb6d",
         "69b468aa35541608f4449c5c",
+        "69b3b708c5949dae6b26eb6d",
+        "69b46e1bb052a4f2e20ece7a",
         "69b555f43af735a9906c6486",
-        "69b3b26644d82934405e9773",
         "69b5b0b5579ffbb5e4b27072",
-        "69bc3c6a84bbfcaa685c1e38",
-        "69bf0f5f0e1980dd1b8e89a5",
+        "69b3b26644d82934405e9773",
         "69bd3ccd2b3745eea5601700",
+        "69bf0f5f0e1980dd1b8e89a5",
+        "69bc3c6a84bbfcaa685c1e38",
         "69bd34221348cf457e66629d",
         "69baadacf25874079e9f24d0",
+        "69b7d116e94a969626b516f2",
         "69c12676ab2d54d20d2ace74",
         "69b4ad6e6eeec30d5962d00f",
-        "69b7d116e94a969626b516f2",
         "69bea7d4dcbd31be3aca1b98",
-        "69c2e6575f22681ea534e7b4",
         "69be6148b036912afac6ae38",
-        "69c2b64092baf8f0c3dfd521",
         "69bcd2f22b5e4e5665f6ba17",
+        "69c2e6575f22681ea534e7b4",
+        "69c2b64092baf8f0c3dfd521",
         "69ba792a08ebed11edf989cf",
         "69b53ff8d8430ef797b74a56",
-        "69cc4198c6be9203a3bb43ad",
+        "69cec0ef476990332b9fc69e",
         "69ceb7d7b3a3e5e779a99245",
-        "69cec0ef476990332b9fc69e"
+        "69cc4198c6be9203a3bb43ad"
       ],
       "last_creep_alert": null,
       "last_creep_delta": null,
@@ -453,7 +469,7 @@
       }
     },
     "6813b6d446e731854c7ac7a2": {
-      "combat_ratio": 29.17,
+      "combat_ratio": 22.22,
       "combat_resets": 0,
       "eco_resets": 1,
       "history": [
@@ -514,34 +530,42 @@
           "new_resets": 1,
           "resetter_combat_ratio": 0.0,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 22.22,
+          "combat_resets": 0,
+          "eco_resets": 1,
+          "new_resets": 1,
+          "resetter_combat_ratio": 9.52,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
+        "69d27621f7ff62dda5ce6824",
         "69d2ac1243a67adf4e024b7b",
         "69d2ed249f38d300d59a2af1",
         "69d29f932813ceeb9b6456a9",
-        "69d27621f7ff62dda5ce6824",
         "69d4ed54bc0ec32a4a42436d",
         "69d55e0f6b595becbf853d79",
-        "69d54b733535a2f5c59c2969",
-        "69d7db33f7cc0387ad133431",
         "69d4e1d011bec0196ea8ecb9",
+        "69d7db33f7cc0387ad133431",
         "69d4dd1c70ab5601d0eb54d9",
-        "69d48aab60c7189005eaa325",
+        "69d54b733535a2f5c59c2969",
         "69d3e6246341955760244029",
         "69d38c1843a5ff07f43d5da6",
         "69d345fb9a1984dba5e7aa74",
         "69d390f1a6974fd542504690",
+        "69d48aab60c7189005eaa325",
         "69d2deee43a5ff07f4e38ecf",
-        "69d413fd9eefccc642122c94",
-        "69d3bf008137730fe4345d1e",
         "69d2cf922813ceeb9bbe9552",
+        "69d3bf008137730fe4345d1e",
         "69d2f03c1affba41e16fc6cd",
+        "69d413fd9eefccc642122c94",
         "69dadb33e86a67f8f63a2672",
-        "69dbcf67f8d47c04e5d4582f",
-        "69dd6ef7af97b01a97fbbfaa",
         "69de381eaf97b01a97859a74",
-        "69dd649422f5623f08d5d8e6"
+        "69dbcf67f8d47c04e5d4582f",
+        "69dd649422f5623f08d5d8e6",
+        "69dd6ef7af97b01a97fbbfaa"
       ],
       "last_creep_alert": null,
       "last_creep_delta": null,
@@ -554,7 +578,7 @@
       "last_urgent_count": null,
       "name": "Italy",
       "new_resets": 1,
-      "resetter_combat_ratio": 0.0,
+      "resetter_combat_ratio": 9.52,
       "sample_size": 25,
       "user_resets": {
         "69d27621f7ff62dda5ce6824": "2026-05-19T11:02:05.043Z",
@@ -567,7 +591,7 @@
         "69d38c1843a5ff07f43d5da6": "2026-04-10T10:46:14.292Z",
         "69d390f1a6974fd542504690": "2026-05-19T14:39:04.779Z",
         "69d3bf008137730fe4345d1e": "2026-05-19T16:57:16.648Z",
-        "69d3e6246341955760244029": "2026-05-19T14:48:57.196Z",
+        "69d3e6246341955760244029": "2026-05-26T17:17:52.180Z",
         "69d413fd9eefccc642122c94": "2026-05-26T04:52:33.218Z",
         "69d48aab60c7189005eaa325": "2026-05-20T20:58:40.486Z",
         "69d4dd1c70ab5601d0eb54d9": "2026-05-23T13:09:32.923Z",
@@ -582,7 +606,7 @@
     "6813b6d446e731854c7ac7a4": {
       "combat_ratio": 53.33,
       "combat_resets": 0,
-      "eco_resets": 1,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 46.15,
@@ -665,22 +689,30 @@
           "new_resets": 1,
           "resetter_combat_ratio": 0.0,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 53.33,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
         "69b03d1b4a0b814a34e06e9a",
-        "69b2a698a583a3b5f9567890",
-        "69b41ca244d8293440241af1",
-        "69b0aedccbf2b5c108e339a1",
         "69b310c919f98f6ceba5b93e",
+        "69b2a698a583a3b5f9567890",
+        "69b0aedccbf2b5c108e339a1",
+        "69b41ca244d8293440241af1",
+        "69b73e37805a5bf5ae2b2bdc",
         "69b7bf95ca9a42b7ef66b7de",
         "69b480b421a9ed4b968a4a40",
-        "69b73e37805a5bf5ae2b2bdc",
-        "69b492545f34cb744fd46517",
         "69ba42913f756b6d59c124e2",
+        "69b492545f34cb744fd46517",
+        "69b323877972e334e3bd22da",
         "69bc678d0f50f6f334a3c4aa",
         "69b311efcbf2b5c108a623af",
-        "69b323877972e334e3bd22da",
         "69c4dc19cde5836cb7979931",
         "69b29bce2895f070b7e6fe90",
         "69c1b1f7585318550a94c71b",
@@ -689,8 +721,8 @@
         "69cfd1565752aefa8b3caaca",
         "69b46b4bb34bca57fd13eba1",
         "69c65cfcc1a06d6b1e74ecfd",
-        "69da360ed11e8da853d42d0c",
         "69d8c35f3553eff9bdbe964f",
+        "69da360ed11e8da853d42d0c",
         "69d52703216f0b15398005ac",
         "69d7ec8324981374504dd728"
       ],
@@ -704,8 +736,8 @@
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Belgium",
-      "new_resets": 1,
-      "resetter_combat_ratio": 0.0,
+      "new_resets": 0,
+      "resetter_combat_ratio": null,
       "sample_size": 25,
       "user_resets": {
         "69b0aedccbf2b5c108e339a1": "2026-04-23T22:27:16.982Z",
@@ -776,7 +808,7 @@
     },
     "6813b6d446e731854c7ac7b8": {
       "combat_ratio": 88.89,
-      "combat_resets": 1,
+      "combat_resets": 0,
       "eco_resets": 0,
       "history": [
         {
@@ -830,23 +862,31 @@
           "new_resets": 1,
           "resetter_combat_ratio": 91.84,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 88.89,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
-        "6825c9bab490ccafd670a30c",
         "6829c71bf9fe6076b38a5379",
-        "681a2f5b4c586e01fbcadba4",
         "68288dae95ff84572bfd0337",
+        "6825c9bab490ccafd670a30c",
+        "681a2f5b4c586e01fbcadba4",
         "6829f52d8c06514dc2a36f74",
         "683083ff9a4536aed996e114",
         "682b241487f122ddeb4bacb6",
         "681797320479a9ceb1902324",
-        "6878b87a002311c68a3f3c26",
         "6879d778820ed429e1825ffb",
+        "6878b87a002311c68a3f3c26",
         "68266beec517b26c38b8fb0a",
         "6878a9c67869eb193752b6d3",
-        "6878bb286097872ea4cce521",
         "682b6bb3e65588148785878e",
+        "6878bb286097872ea4cce521",
         "6878987463ae472cc7fb4f4a",
         "682f7ce98dff660fbf201ea6",
         "6878f3592bdf9a42b590de26",
@@ -869,8 +909,8 @@
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Lithuania",
-      "new_resets": 1,
-      "resetter_combat_ratio": 91.84,
+      "new_resets": 0,
+      "resetter_combat_ratio": null,
       "sample_size": 25,
       "user_resets": {
         "681a2f5b4c586e01fbcadba4": "2026-04-03T02:50:26.231Z",
@@ -983,33 +1023,41 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 0.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
         "691c31c69317706a74ff84fe",
         "6912b18159d39d64afbbc4f0",
         "691a31f392948e91cb9d2334",
-        "6943c1cc980f402c92ce7879",
         "69619a809aa619cc592ea334",
-        "696e0aef82ecc0f3cf5d509b",
+        "6943c1cc980f402c92ce7879",
         "695041f32b332672a6278aff",
-        "6918b289cc751d7f455cb802",
         "696d5777fe9d5e4fd70a652e",
+        "696e0aef82ecc0f3cf5d509b",
+        "6918b289cc751d7f455cb802",
         "6952f188acdca89d8619919a",
-        "692eeffccd4d5524651ce880",
-        "68f5dd6a22a4934adae9e491",
         "68f789b046ad5078319c5bbf",
-        "696d1e537480b5635b033192",
+        "68f5dd6a22a4934adae9e491",
+        "692eeffccd4d5524651ce880",
         "69703b8eaadefa371703c72a",
+        "696d1e537480b5635b033192",
         "6919be1bdb65494c1b26afa1",
         "69827a0e7cf831a523f54bd7",
-        "698de9b6f4652a0daac50ffa",
         "6991461c6bb70e191fe7a395",
         "698c0ef6dd9e998685eb9270",
+        "698de9b6f4652a0daac50ffa",
         "696b9c5ac9c4e2ee34af5bbf",
         "69a271f6ef10a1245a784c5a",
-        "696a1e0ccd257554cd1950b9",
         "696ef0a491307f1d7ce7090a",
+        "696a1e0ccd257554cd1950b9",
         "69b0017ca403356a8a908828"
       ],
       "last_creep_alert": null,
@@ -1124,6 +1172,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 50.24,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
@@ -1133,8 +1189,8 @@
         "6955be14b1fc6d0b7bfde964",
         "6977a239ab7663db3ac03c5e",
         "69892fbcc5c82ef9aea416c3",
-        "69bd149d1348cf457e2c64bb",
         "696b989e1eb1704c85ed0a30",
+        "69bd149d1348cf457e2c64bb",
         "69c48d5e1bbe1908ba627f18",
         "69767e08d0b91ae6b45500bb"
       ],
@@ -1462,13 +1518,21 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 51.56,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
         "686d5998b39f079a4a6ab8bd",
         "686222896c0e408991840f98",
-        "6919ca3f8510e2692885fda6",
         "691a402bdb65494c1b646a40",
+        "6919ca3f8510e2692885fda6",
         "686fce41b8d1854d9d207c8e",
         "690420f04c4e3789a41cf68d",
         "6919387745ce8539d042fc98",
@@ -1514,8 +1578,8 @@
     },
     "6813b6d546e731854c7ac848": {
       "combat_ratio": 0.0,
-      "combat_resets": 1,
-      "eco_resets": 1,
+      "combat_resets": 0,
+      "eco_resets": 0,
       "history": [
         {
           "combat_ratio": 0.0,
@@ -1598,6 +1662,14 @@
           "new_resets": 2,
           "resetter_combat_ratio": 50.0,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 0.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
@@ -1606,19 +1678,19 @@
         "69b84ea0ac25743c3fc8710b",
         "69b933fe6843e2268ab37d0c",
         "69b94d08caa5376ae5778a44",
-        "69b99646feade6de9e1a9125",
         "69b875367ae3343efd514ae4",
+        "69b99646feade6de9e1a9125",
+        "69cfcfce7c951c1d66bced6b",
         "69d4158c6341955760edcd24",
         "69b83f587ae3343efdbcd85d",
-        "69cfcfce7c951c1d66bced6b",
-        "691bb1a750d80e15bc06952b",
-        "69d27ee27862e72e00400d4b",
-        "69d4ee43e83deb4e60e151c0",
         "69cc2ac5a1cf1b9306930f0b",
+        "691bb1a750d80e15bc06952b",
+        "69d4ee43e83deb4e60e151c0",
+        "69d27ee27862e72e00400d4b",
         "69dc26daf8d47c04e5390f51",
-        "69c3c59e68a97bd50e031381",
-        "69d43d5c2e2a33a2ae5b912d",
         "69e0d4efb6989dc2116ba37d",
+        "69d43d5c2e2a33a2ae5b912d",
+        "69c3c59e68a97bd50e031381",
         "69d7c5cdf5419ebd5ba66559"
       ],
       "last_creep_alert": null,
@@ -1631,8 +1703,8 @@
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Morocco",
-      "new_resets": 2,
-      "resetter_combat_ratio": 50.0,
+      "new_resets": 0,
+      "resetter_combat_ratio": null,
       "sample_size": 19,
       "user_resets": {
         "6917de6050d80e15bcdb91f9": "2026-05-20T23:10:12.768Z",
@@ -1742,24 +1814,32 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 0.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
         "6999a9d29e864b6c118b8048",
         "69b76ebe95d04b39a3984ba0",
         "69c7bb89c1a06d6b1eb6b832",
-        "69cd7fe6d3c41fea89e78ebc",
         "69ceafe8f6e3d77336c6e789",
-        "69d028158c2824b1034594f0",
+        "69cd7fe6d3c41fea89e78ebc",
         "69d1151d78e94f288e61780a",
+        "69d028158c2824b1034594f0",
         "69d7d51fabd1bf8c1ff950f3",
-        "69d2a8a2c957f80717156eaf",
         "69d044f35098cc20271e21d0",
-        "69d8e53dd6d9b31f49752860",
-        "69d027e0e3889832aea1dd41",
+        "69d2a8a2c957f80717156eaf",
         "69d82709e86a67f8f6c9ea77",
-        "69d7f27492e0a751daa3879d",
-        "69e0a6e74e15eeb2990b0852"
+        "69d027e0e3889832aea1dd41",
+        "69d8e53dd6d9b31f49752860",
+        "69e0a6e74e15eeb2990b0852",
+        "69d7f27492e0a751daa3879d"
       ],
       "last_creep_alert": null,
       "last_creep_delta": null,
@@ -2010,12 +2090,20 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-05-26T15:50:24.336345+00:00"
+        },
+        {
+          "combat_ratio": 6.9,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-05-26T20:13:49.914165+00:00"
         }
       ],
       "known_veterans": [
         "6818f900286675c678920eea",
-        "68299b85e10d9906654ce2ec",
         "6820e463d7b95c3c75c20727",
+        "68299b85e10d9906654ce2ec",
         "6878df0adb897ec4d58bf9cd",
         "68970cf04fad0d6e36b2f310",
         "68f50c56dd4b0abd5938c1cf",
@@ -2023,8 +2111,8 @@
         "69150c494e48e9d359ce054c",
         "682085d9d6fa1e7f1606ebcb",
         "6955be14b1fc6d0b7bfde964",
-        "698b537def0c6320c861c3f2",
         "69c3fa526853ceaa7a149222",
+        "698b537def0c6320c861c3f2",
         "69d161d6904e27bdeea39cf7"
       ],
       "last_creep_alert": null,
@@ -2055,6 +2143,6 @@
     }
   },
   "flagged_last_run": [],
-  "last_run": "2026-05-26T15:50:24.336345+00:00",
+  "last_run": "2026-05-26T20:13:49.914165+00:00",
   "version": 6
 }
