@@ -757,9 +757,9 @@ def trend_field(history, snap):
     reset_series = [h.get("new_resets", 0) for h in history] + [snap["new_resets"]]
     ratio_series = [h["combat_ratio"] for h in history] + [snap["combat_ratio"]]
     return (
-        f"`{sparkline(reset_series)}` skill switches per day "
+        f"`{sparkline(reset_series)}` skill rebuilds per check "
         f"({reset_series[0]} → {reset_series[-1]})\n"
-        f"`{sparkline(ratio_series)}` typical citizen's combat focus "
+        f"`{sparkline(ratio_series)}` typical fighter's combat focus "
         f"({ratio_series[0]:.0f}% → {ratio_series[-1]:.0f}%)"
     )
 
@@ -784,14 +784,14 @@ def _resetter_summary(snap):
         return None
     combat_resets = snap.get("combat_resets", 0)
     eco_resets = snap.get("eco_resets", 0)
-    n = snap.get("new_resets", 0)
 
     parts = []
-    if n >= 1:
-        if combat_resets >= 1:
-            parts.append(f"**{combat_resets} of {n}** rebuilt as a combat fighter")
-        elif eco_resets >= 1:
-            parts.append(f"**{eco_resets} of {n}** rebuilt as a worker")
+    if combat_resets >= 1:
+        people = "1 of them" if combat_resets == 1 else f"{combat_resets} of them"
+        parts.append(f"{people} rebuilt into a combat build")
+    elif eco_resets >= 1:
+        people = "1 of them" if eco_resets == 1 else f"{eco_resets} of them"
+        parts.append(f"{people} rebuilt into an economy build")
 
     if rcr >= COMBAT_INTENT:
         descriptor = "heavily combat-focused"
@@ -802,8 +802,8 @@ def _resetter_summary(snap):
     else:
         descriptor = "heavily economy-focused"
 
-    parts.append(f"typical rebuild is {descriptor} ({rcr:.0f}% combat skills)")
-    return " · ".join(parts)
+    parts.append(f"the typical rebuild is {descriptor} ({rcr:.0f}% combat)")
+    return ", ".join(parts) + "."
 
 
 def send_high_severity_burst(country_name, snap, burst, history):
@@ -824,27 +824,27 @@ def send_high_severity_burst(country_name, snap, burst, history):
         baseline_clause = ""
 
     description = (
-        f"**{n} of {sample_size}** top citizens ({pct:.0f}%) wiped and rebuilt "
-        f"their skills since yesterday's check. Skill switches cost gold, "
-        f"so this kind of activity usually means people are repurposing "
-        f"themselves — typically for combat. {baseline_clause}"
+        f"**{n} of the top {sample_size} fighters** ({pct:.0f}%) wiped and "
+        f"rebuilt their skills since the last check. Rebuilding costs gold, "
+        f"so a cluster like this usually means people are repurposing "
+        f"themselves, typically for combat. {baseline_clause}"
     ).strip()
 
     fields = [
         {
-            "name": "Who we're watching",
+            "name": "Who this tracks",
             "value": (
                 f"The top **{sample_size}** active fighters in this country "
-                f"(level ≥ {MIN_LEVEL}, online in last {ACTIVITY_WINDOW_DAYS} days)."
+                f"(level {MIN_LEVEL}+, online in the last {ACTIVITY_WINDOW_DAYS} days)."
             ),
             "inline": False,
         },
         {
-            "name": "Current combat focus",
+            "name": "Where they stand now",
             "value": (
-                f"The typical sampled citizen has spent **{snap['combat_ratio']:.0f}%** "
-                f"of their skill points on combat skills "
-                f"(vs. **{100 - snap['combat_ratio']:.0f}%** on economy)."
+                f"The typical one of these fighters has put **{snap['combat_ratio']:.0f}%** "
+                f"of their skill points into combat "
+                f"(the other **{100 - snap['combat_ratio']:.0f}%** on economy)."
             ),
             "inline": False,
         },
@@ -853,7 +853,7 @@ def send_high_severity_burst(country_name, snap, burst, history):
     resetter_line = _resetter_summary(snap)
     if resetter_line:
         fields.append({
-            "name": "What the people who switched are doing",
+            "name": "What the rebuilders chose",
             "value": resetter_line,
             "inline": False,
         })
@@ -880,30 +880,29 @@ def send_high_severity_demob(country_name, snap, collapse, history):
     window_text = "the past day" if window == 1 else f"the past {window} days"
 
     description = (
-        f"Top fighters in **{country_name}** are visibly de-escalating. Their "
-        f"combat focus dropped from **{collapse['old_ratio']:.0f}% → "
-        f"{snap['combat_ratio']:.0f}%** over {window_text} — they're shifting "
-        f"skill points back to economy. This typically means a campaign is "
-        f"ending and they're returning to peacetime activity. **Likely no "
-        f"longer an immediate threat.**"
+        f"The top fighters in **{country_name}** are clearly easing off war. "
+        f"Their typical combat focus dropped from **{collapse['old_ratio']:.0f}% "
+        f"to {snap['combat_ratio']:.0f}%** over {window_text}, moving skill "
+        f"points back into economy. This usually means a campaign is wrapping "
+        f"up. **Likely no longer an immediate threat.**"
     )
 
     fields = [
         {
-            "name": "Who we're watching",
+            "name": "Who this tracks",
             "value": (
                 f"The top **{snap['sample_size']}** active fighters in "
-                f"{country_name} (level ≥ {MIN_LEVEL}, online in last "
+                f"{country_name} (level {MIN_LEVEL}+, online in the last "
                 f"{ACTIVITY_WINDOW_DAYS} days)."
             ),
             "inline": False,
         },
         {
-            "name": "Current combat focus",
+            "name": "Where they stand now",
             "value": (
-                f"The typical sampled citizen now has **{snap['combat_ratio']:.0f}%** "
-                f"of their skill points on combat skills "
-                f"(vs. **{100 - snap['combat_ratio']:.0f}%** on economy)."
+                f"The typical one of these fighters now has **{snap['combat_ratio']:.0f}%** "
+                f"of their skill points in combat "
+                f"(the other **{100 - snap['combat_ratio']:.0f}%** on economy)."
             ),
             "inline": False,
         },
@@ -912,7 +911,7 @@ def send_high_severity_demob(country_name, snap, collapse, history):
     resetter_line = _resetter_summary(snap)
     if resetter_line:
         fields.append({
-            "name": "What the people who switched are doing",
+            "name": "What the rebuilders chose",
             "value": resetter_line,
             "inline": False,
         })
@@ -939,30 +938,29 @@ def send_high_severity_creep(country_name, snap, creep, history):
     gain = creep["delta"]
 
     description = (
-        f"**{country_name}**'s top fighters have made a major shift toward "
-        f"combat skills. The typical sampled citizen went from "
-        f"**{creep['old_ratio']:.0f}% combat-focused → {snap['combat_ratio']:.0f}% "
-        f"combat-focused** over {window_text} (a {gain:.0f}-point shift). "
-        f"This is a completed rebuild, not necessarily today's activity — "
-        f"so it may indicate they're now war-ready rather than preparing."
+        f"The top fighters in **{country_name}** have made a big move toward "
+        f"combat. Their typical combat focus went from **{creep['old_ratio']:.0f}% "
+        f"to {snap['combat_ratio']:.0f}%** over {window_text} (a {gain:.0f}-point "
+        f"jump). This looks like a finished rebuild rather than today's activity, "
+        f"so they may already be war-ready rather than still preparing."
     )
 
     fields = [
         {
-            "name": "Who we're watching",
+            "name": "Who this tracks",
             "value": (
                 f"The top **{snap['sample_size']}** active fighters in "
-                f"{country_name} (level ≥ {MIN_LEVEL}, online in last "
+                f"{country_name} (level {MIN_LEVEL}+, online in the last "
                 f"{ACTIVITY_WINDOW_DAYS} days)."
             ),
             "inline": False,
         },
         {
-            "name": "Recent activity",
+            "name": "Fresh rebuilds this check",
             "value": (
-                f"**{snap['new_resets']}** skill switches in the latest check. "
-                f"A shift this large without much fresh reset activity usually "
-                f"means the rebuild happened over the preceding days."
+                f"**{snap['new_resets']}** skill rebuild(s) in the latest check. "
+                f"A shift this big with little fresh rebuild activity means most "
+                f"of it happened over the preceding days."
             ),
             "inline": False,
         },
@@ -993,40 +991,81 @@ def _digest_line_burst(name, snap, burst, severity):
     rcr = snap.get("resetter_combat_ratio")
     combat_resets = snap.get("combat_resets", 0)
 
-    main = f"**{n} of {sample}** top citizens ({pct:.0f}%) switched their builds"
+    main = (
+        f"**{n} of the top {sample} fighters** ({pct:.0f}%) wiped and rebuilt "
+        f"their skills since the last check"
+    )
     if combat_resets >= 1 and rcr is not None and rcr >= COMBAT_INTENT:
+        rebuilt = "rebuilt into a combat build" if combat_resets == 1 else "rebuilt into combat builds"
         main += (
-            f" — **{combat_resets} of {n}** rebuilt as combat fighters "
-            f"({rcr:.0f}% combat skills). Concrete preparation signal."
+            f". Of those, {combat_resets} {rebuilt} ({rcr:.0f}% combat). "
+            f"Rebuilds cost gold, so this is a concrete sign of war prep."
         )
     elif rcr is not None:
         main += (
-            f" (typical resetter is now {rcr:.0f}% combat). "
-            f"Costly activity — usually means repurposing for combat."
+            f" (the typical one is now {rcr:.0f}% combat). Rebuilds cost gold, "
+            f"so this usually means people are repurposing for combat."
         )
     else:
-        main += ". Costly activity — usually means repurposing for combat."
+        main += ". Rebuilds cost gold, so this usually means repurposing for combat."
     return icon, name, main
 
 
 def _digest_line_combat_intent(name, snap, intent):
     icon = "🟠"
     n = intent["combat_resets"]
-    total = intent["new_resets"]
     rcr = intent["resetter_combat_ratio"]
-    sample = snap["sample_size"]
-    citizen = "citizen" if n == 1 else "citizens"
+    people = "1 fighter" if n == 1 else f"{n} fighters"
     main = (
-        f"**{n} of {total}** {citizen} (out of {sample} top citizens) "
-        f"rebuilt as combat fighters ({rcr:.0f}% combat skills)"
+        f"{people} among the top 25 just rebuilt into a combat build "
+        f"({rcr:.0f}% of their skill points now on combat)."
     )
     if intent.get("corroborated_by") == "ratio_shift":
         main += (
-            f" — confirmed by 7d ratio shift of +{intent['ratio_shift_7d']:.0f}pp. "
-            f"Small numbers but directionally consistent with mobilisation."
+            f" The country's overall combat focus is up "
+            f"{intent['ratio_shift_7d']:.0f} points this week too, so the "
+            f"switch fits a broader trend. Early sign of mobilisation."
         )
     else:
-        main += ". Multiple resetters in the same direction — early mobilisation signal."
+        main += " Several people moving the same way is an early sign of mobilisation."
+    return icon, name, main
+
+
+def _digest_line_creep(name, snap, creep):
+    tier = creep.get("tier", "yellow")
+    icon = {"red": "🔴", "orange": "🟠", "yellow": "🟡"}[tier]
+    label = {
+        "red": "Major combat shift (likely now war-ready)",
+        "orange": "Significant combat shift (mobilising)",
+        "yellow": "Drifting toward combat (worth watching)",
+    }[tier]
+    window = creep["window_days"]
+    window_text = "the past day" if window == 1 else f"the past {window} days"
+    main = (
+        f"{label}: the typical top fighter's combat focus climbed from "
+        f"**{creep['old_ratio']:.0f}% to {snap['combat_ratio']:.0f}%** "
+        f"over {window_text}."
+    )
+    return icon, name, main
+
+
+def _digest_line_eco_intent(name, snap, intent):
+    icon = "🟢"
+    n = intent["eco_resets"]
+    rcr = intent["resetter_combat_ratio"]
+    people = "1 fighter" if n == 1 else f"{n} fighters"
+    main = (
+        f"{people} among the top 25 just rebuilt into an economy build "
+        f"({rcr:.0f}% of their skill points on combat, the rest on economy)."
+    )
+    if intent.get("corroborated_by") == "ratio_shift":
+        main += (
+            f" The country's overall combat focus is down "
+            f"{abs(intent['ratio_shift_7d']):.0f} points this week too. "
+            f"Early sign they're standing down."
+        )
+    else:
+        main += " People moving back to economy is an early sign they're standing down."
     return icon, name, main
 
 
@@ -1052,36 +1091,16 @@ def _digest_line_collapse(name, snap, collapse):
     tier = collapse.get("tier", "green_light")
     label = {
         "green_strong": "Strong stand-down (campaign likely ending)",
-        "green_med": "Visible stand-down (de-escalating)",
-        "green_light": "Drifting away from combat (early stand-down signal)",
+        "green_med": "Standing down (de-escalating)",
+        "green_light": "Easing off combat (early stand-down sign)",
     }[tier]
     window = collapse["window_days"]
     window_text = "the past day" if window == 1 else f"the past {window} days"
     main = (
-        f"{label}: typical citizen went from **{collapse['old_ratio']:.0f}% → "
-        f"{snap['combat_ratio']:.0f}% combat** over {window_text}"
+        f"{label}: the typical top fighter's combat focus fell from "
+        f"**{collapse['old_ratio']:.0f}% to {snap['combat_ratio']:.0f}%** "
+        f"over {window_text}."
     )
-    return icon, name, main
-
-
-def _digest_line_eco_intent(name, snap, intent):
-    icon = "🟢"
-    n = intent["eco_resets"]
-    total = intent["new_resets"]
-    rcr = intent["resetter_combat_ratio"]
-    sample = snap["sample_size"]
-    citizen = "citizen" if n == 1 else "citizens"
-    main = (
-        f"**{n} of {total}** {citizen} (out of {sample} top citizens) "
-        f"rebuilt as workers ({rcr:.0f}% combat skills)"
-    )
-    if intent.get("corroborated_by") == "ratio_shift":
-        main += (
-            f" — confirmed by 7d ratio shift of {intent['ratio_shift_7d']:.0f}pp. "
-            f"Small numbers but directionally consistent with demobilisation."
-        )
-    else:
-        main += ". Multiple resetters returning to economy — early stand-down signal."
     return icon, name, main
 
 
@@ -1272,10 +1291,10 @@ def send_digest(flagged, stood_down, holding, now):
     summary = ", ".join(parts) if parts else None
 
     intro = (
-        "Each line below tracks the top ~25 active fighters in a country "
-        "(level ≥ 20, recently online) — the people who actually show up "
-        "to battles. \"Combat focus\" means the share of a citizen's "
-        "skill points spent on combat skills.\n\n"
+        "Each line tracks the top ~25 active fighters in a country "
+        "(level 20+, recently online) — the people who actually turn up "
+        "to battles. \"Combat focus\" is the share of a fighter's skill "
+        "points spent on combat skills rather than economy.\n\n"
     )
 
     total_items = len(full_lines) + len(minor_dedup) + len(holding) + len(stood_down)
