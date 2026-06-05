@@ -1006,24 +1006,38 @@ def _digest_line_burst(name, snap, burst, severity):
     pct = (n / sample) * 100 if sample else 0
     rcr = snap.get("resetter_combat_ratio")
     combat_resets = snap.get("combat_resets", 0)
+    eco_resets = snap.get("eco_resets", 0)
 
     main = (
         f"**{n} of the top {sample} fighters** ({pct:.0f}%) wiped and rebuilt "
         f"their skills since the last check"
     )
+
+    # Describe the actual direction of the rebuilds, not a hardcoded
+    # "for combat". rcr is the median combat focus of the people who
+    # rebuilt this check (share of their skill points spent on combat).
     if combat_resets >= 1 and rcr is not None and rcr >= COMBAT_INTENT:
-        rebuilt = "rebuilt into a combat build" if combat_resets == 1 else "rebuilt into combat builds"
+        builds = "a combat build" if combat_resets == 1 else "combat builds"
         main += (
-            f". Of those, {combat_resets} {rebuilt} ({rcr:.0f}% combat). "
-            f"Rebuilds cost gold, so this is a concrete sign of war prep."
+            f". {combat_resets} of them rebuilt into {builds}, putting "
+            f"{rcr:.0f}% of their points into combat. Rebuilds cost gold, "
+            f"so this is a concrete sign of war prep."
+        )
+    elif eco_resets >= 1 and rcr is not None and rcr <= DEMOB_RESET_INTENT:
+        builds = "an economy build" if eco_resets == 1 else "economy builds"
+        main += (
+            f". {eco_resets} of them rebuilt into {builds}, putting only "
+            f"{rcr:.0f}% of their points into combat (the rest on economy). "
+            f"This points away from war, not toward it."
         )
     elif rcr is not None:
         main += (
-            f" (the typical one is now {rcr:.0f}% combat). Rebuilds cost gold, "
-            f"so this usually means people are repurposing for combat."
+            f". The ones who rebuilt put about {rcr:.0f}% of their points "
+            f"into combat, so the direction is mixed. Rebuilds cost gold, "
+            f"so it's worth watching either way."
         )
     else:
-        main += ". Rebuilds cost gold, so this usually means repurposing for combat."
+        main += ". Rebuilds cost gold, so a cluster like this is worth watching."
     return icon, name, main
 
 
@@ -1032,9 +1046,10 @@ def _digest_line_combat_intent(name, snap, intent):
     n = intent["combat_resets"]
     rcr = intent["resetter_combat_ratio"]
     people = "1 fighter" if n == 1 else f"{n} fighters"
+    verb = "has" if n == 1 else "have"
     main = (
-        f"{people} among the top 25 just rebuilt into a combat build "
-        f"({rcr:.0f}% of their skill points now on combat)."
+        f"{people} among the top 25 {verb} just rebuilt into a combat build, "
+        f"each now spending about {rcr:.0f}% of their skill points on combat."
     )
     if intent.get("corroborated_by") == "ratio_shift":
         main += (
@@ -1088,9 +1103,11 @@ def _digest_line_eco_intent(name, snap, intent):
     n = intent["eco_resets"]
     rcr = intent["resetter_combat_ratio"]
     people = "1 fighter" if n == 1 else f"{n} fighters"
+    verb = "has" if n == 1 else "have"
     main = (
-        f"{people} among the top 25 just rebuilt into an economy build "
-        f"({rcr:.0f}% of their skill points on combat, the rest on economy)."
+        f"{people} among the top 25 {verb} just rebuilt into an economy build, "
+        f"each now spending only {rcr:.0f}% of their skill points on combat "
+        f"(the rest on economy)."
     )
     if intent.get("corroborated_by") == "ratio_shift":
         main += (
