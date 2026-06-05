@@ -42,6 +42,17 @@ STATE_FILE = Path("war_state.json")
 STATE_VERSION = 6
 IRELAND_COUNTRY_ID = "6813b6d446e731854c7ac7fe"
 
+# Ireland's home region IDs. These map territories are fixed; ownership
+# changes when Ireland is invaded but the region IDs do not. We anchor the
+# border walk on these so the watchlist survives occupation instead of
+# collapsing to just active enemies. Update only if the game remaps Ireland.
+IRELAND_REGION_IDS = [
+    "6813b7069403bc4170a5d825",
+    "6813b7069403bc4170a5d828",
+    "6813b7069403bc4170a5d82b",
+    "6813b7069403bc4170a5d82e",
+]
+
 # Watchlist scope
 BORDER_HOPS = 3
 
@@ -172,22 +183,28 @@ def fetch_ireland():
         return None
 
 
-def find_border_countries(regions_obj, country_id, max_hops=None):
+def find_border_countries(regions_obj, country_id, home_region_ids, max_hops=None):
     if max_hops is None:
         max_hops = BORDER_HOPS
 
-    own_ids = {
+    # Anchor on Ireland's fixed home regions (ownership-independent, so the
+    # walk works even while Ireland is occupied) plus any regions Ireland
+    # currently owns (so territorial expansions are covered when it isn't).
+    owned_now = {
         r["_id"] for r in regions_obj.values()
         if isinstance(r, dict)
         and r.get("country") == country_id
         and r.get("_id")
     }
-    # Diagnostic: surfaces a silently-shrunk watchlist. "regions fetched: 0"
-    # means the proxy call failed; ">0 fetched but 0 Ireland matched" means
-    # the country ID or Ireland's territory changed; ">0 matched but 0
-    # border countries" means the neighbor/country field shape changed.
-    print(f"  [debug] regions fetched: {len(regions_obj)}, "
-          f"Ireland regions matched: {len(own_ids)}", file=sys.stderr)
+    home_present = [rid for rid in home_region_ids if rid in regions_obj]
+    own_ids = set(home_present) | owned_now
+
+    occupied = not owned_now and bool(home_present)
+    occ_note = " (OCCUPIED, anchoring on home regions)" if occupied else ""
+    print(f"  [debug] regions fetched: {len(regions_obj)}, Ireland owns now: "
+          f"{len(owned_now)}, home regions anchored: {len(home_present)}{occ_note}",
+          file=sys.stderr)
+
     visited = set(own_ids)
     frontier = set(own_ids)
     borders = {}
@@ -234,7 +251,7 @@ def _extract_diplomatic_enemies(ireland):
 def build_watchlist(regions_obj, ireland):
     entries = {}
     for ncid, region_names in find_border_countries(
-        regions_obj, IRELAND_COUNTRY_ID
+        regions_obj, IRELAND_COUNTRY_ID, IRELAND_REGION_IDS
     ).items():
         entries[ncid] = {
             "border_regions": sorted(set(region_names)),
@@ -1795,4 +1812,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
