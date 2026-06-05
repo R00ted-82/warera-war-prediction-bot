@@ -596,11 +596,11 @@ def detect_eco_intent_resets(snap, history, now):
     return None
 
 
-def _find_history_point(history, target, min_age_days):
+def _find_history_point(history, target, now, min_age_days):
     if not history:
         return None
     closest = min(history, key=lambda h: abs(parse_iso(h["ts"]) - target))
-    age_days = (target - parse_iso(closest["ts"])).total_seconds() / 86400
+    age_days = (now - parse_iso(closest["ts"])).total_seconds() / 86400
     if age_days < min_age_days - 0.5:
         return None
     return closest
