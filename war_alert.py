@@ -4,21 +4,22 @@ War preparation alert bot.
 This version:
 
   * Watchlist anchors on Ireland's fixed home regions (IRELAND_REGION_IDS)
-    so it survives occupation; expansions are still picked up via regions
-    Ireland currently owns. find_border_countries prints region/border
-    counts to stderr for visibility.
+    so it survives occupation; expansions are picked up via regions Ireland
+    currently owns. find_border_countries prints region/border counts.
   * Sample is the top SAMPLE_TOP_N (50) most active high-level players per
     country, by level. Reset floors scaled to the larger sample.
-  * Reset bursts are classified by direction: combat/mixed bursts are
-    mobilisation signals (red/orange); economy-directed bursts are a green
-    stand-down signal, not a war-prep one.
-  * All player-facing copy says "players" (the pool is top-by-level active
-    users, not combat-built fighters) and labels every percentage as combat
-    focus / share of skill points.
-  * _find_history_point ages from `now`; ratio creep/collapse/corroboration
-    all work.
-  * Daily posture report (war vs economy split) gated to the first run at
-    or after 21:00 UTC.
+  * Reset bursts classified by direction: combat/mixed = mobilisation
+    (red/orange); economy-directed = green stand-down signal.
+  * "Holding at high readiness" appears only in the daily posture report,
+    not the per-run digest. The per-run digest posts only on fresh flags
+    or stand-downs.
+  * Heartbeat: the daily posture report carries an "all quiet" line when
+    nothing fired, so a healthy run is visible once a day. A staleness
+    watchdog fires a health alert when the previous run is older than
+    STALE_RUN_HOURS (catches missed/hung runs once they resume).
+  * Player-facing copy says "players"; every percentage labelled as combat
+    focus. _find_history_point ages from `now`. Posture report gated to the
+    first run at/after 21:00 UTC.
 
 State fields: last_flagged_peak_ratio, last_flagged_at, last_posture_date.
 STATE_VERSION 6 with idempotent migration.
@@ -118,6 +119,9 @@ POSTURE_MOVER_MIN = 5.0 # minimum 7d shift to list as a mover
 
 # Pipeline health
 HEALTH_SNAPSHOT_RATE = 0.5
+STALE_RUN_HOURS = 9        # alert if the previous run completed longer ago
+                            # than this. 3h cadence, so 9h ~ 3 missed runs.
+                            # Lower toward 6-7 to catch a single missed run.
 
 # Embed colours
 COLOUR_RESET_BURST = 0xED4245
@@ -1161,7 +1165,7 @@ def _digest_line_eco_intent(name, snap, intent):
     return icon, name, main
 
 
-# ---------- Digest assembly with rollup and holding state ----------
+# ---------- Digest assembly with rollup ----------
 
 def _is_low_severity(flag):
     if flag["kind"] == "creep" and flag["detection"].get("tier") == "yellow":
@@ -1184,7 +1188,12 @@ def _minor_activity_label(flag):
     return name
 
 
-def send_digest(flagged, stood_down, holding, now):
+def send_digest(flagged, stood_down, now):
+    """Per-run alert roll-up. Posts whenever there's a fresh flag or a
+    stand-down this run. "Holding at high readiness" is intentionally NOT
+    here, it lives in the daily posture report, so a country that stays
+    mobilised but quiet doesn't re-trigger this digest every 3 hours.
+    """
     full_line_by_cid = {}
     for f in flagged:
         if not _is_low_severity(f):
@@ -1255,36 +1264,6 @@ def send_digest(flagged, stood_down, holding, now):
             "inline": False,
         })
 
-    if holding:
-        holding_lines = []
-        for h in sorted(holding, key=lambda x: -x["current_ratio"])[:15]:
-            if h.get("reason") == "active_war":
-                line = (
-                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
-                    f"(actively at war with Ireland)"
-                )
-            elif h.get("peak_date") and h["peak_date"] != "unknown":
-                line = (
-                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
-                    f"(peaked {h['peak_ratio']:.0f}% on {h['peak_date']})"
-                )
-            else:
-                line = (
-                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
-                    f"(still in combat posture)"
-                )
-            holding_lines.append(line)
-        fields.append({
-            "name": "🟠 Holding at high readiness",
-            "value": (
-                "_Previously mobilised, no fresh activity this run, but "
-                "combat posture remains. Not a new warning, a reminder "
-                "these countries are still elevated._\n"
-                + "\n".join(holding_lines)
-            ),
-            "inline": False,
-        })
-
     if stood_down:
         stood_down_lines = []
         by_reason = {"ratio_dropped": [], "soft_flag": [], "retired_no_data": []}
@@ -1344,10 +1323,10 @@ def send_digest(flagged, stood_down, holding, now):
         parts.append(f"**{counts_mob['med']}** preparing")
     if minor_dedup:
         parts.append(f"**{len(minor_dedup)}** minor")
-    if holding:
-        parts.append(f"**{len(holding)}** holding")
     if counts_demob:
         parts.append(f"**{counts_demob}** standing down")
+    if stood_down:
+        parts.append(f"**{len(stood_down)}** no longer flagged")
     summary = ", ".join(parts) if parts else None
 
     intro = (
@@ -1357,7 +1336,7 @@ def send_digest(flagged, stood_down, holding, now):
         f"skills rather than economy.\n\n"
     )
 
-    total_items = len(full_lines) + len(minor_dedup) + len(holding) + len(stood_down)
+    total_items = len(full_lines) + len(minor_dedup) + len(stood_down)
     if total_items:
         body = f"{summary} ({total_items} total)." if summary else f"{total_items} items."
         description = intro + body
@@ -1393,11 +1372,14 @@ def _posture_bucket(ratio):
     return "eco"
 
 
-def send_posture_digest(snapshots, state, active_war_ids, country_name, watchlist, now):
-    """End-of-day report: every monitored country sorted into a war side
-    and an economy side, with a per-tier breakdown and the week's biggest
-    movers. Also reports monitored-vs-sampled counts and names any country
-    that couldn't be read this run. Sent once a day, independent of alerts.
+def send_posture_digest(snapshots, state, active_war_ids, country_name,
+                        watchlist, holding, flagged, stood_down, now):
+    """End-of-day report and daily heartbeat. Sorts every monitored country
+    into a war side and an economy side, with a per-tier breakdown, the
+    week's biggest movers, the "holding at high readiness" reminder (once a
+    day, here, not in the per-run digest), and any country that couldn't be
+    read. Carries an "all quiet" status line when nothing fired, so a
+    healthy run is visible once a day even on a calm day.
     """
     rows = []
     for cid, snap in snapshots.items():
@@ -1448,6 +1430,23 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name, watchlis
 
     avg_ratio = statistics.mean(r["ratio"] for r in rows)
 
+    # Heartbeat / activity status line
+    mob = sum(1 for f in flagged if f["kind"] in ("burst", "combat_intent", "creep"))
+    demob = sum(1 for f in flagged if f["kind"] in ("collapse", "eco_intent", "eco_burst"))
+    bits = []
+    if mob:
+        bits.append(f"**{mob}** mobilising")
+    if demob:
+        bits.append(f"**{demob}** standing down")
+    if stood_down:
+        bits.append(f"**{len(stood_down)}** no longer flagged")
+    if holding:
+        bits.append(f"**{len(holding)}** holding")
+    if bits:
+        status_line = "Today's signals: " + ", ".join(bits) + ".\n\n"
+    else:
+        status_line = "✅ All quiet today: no mobilisation or stand-down signals.\n\n"
+
     scope = (
         f"**{sampled} countries**"
         if sampled == monitored
@@ -1455,7 +1454,8 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name, watchlis
              f"few active players to read)"
     )
     description = (
-        f"How {scope} are split right now, by what their top players are "
+        status_line
+        + f"How {scope} are split right now, by what their top players are "
         f"built for. \"Combat focus\" is the share of skill points a typical "
         f"top player spends on combat skills rather than economy.\n\n"
         f"⚔️ **War footing: {war_side}**     🌾 **Economy footing: {eco_side}**\n"
@@ -1512,6 +1512,34 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name, watchlis
         fields.append({
             "name": "📉 Winding down (shifted toward economy this week)",
             "value": "\n".join(_mover_line(r) for r in fallers),
+            "inline": False,
+        })
+
+    if holding:
+        holding_lines = []
+        for h in sorted(holding, key=lambda x: -x["current_ratio"])[:15]:
+            if h.get("reason") == "active_war":
+                holding_lines.append(
+                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
+                    f"(at war with Ireland)"
+                )
+            elif h.get("peak_date") and h["peak_date"] != "unknown":
+                holding_lines.append(
+                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
+                    f"(peaked {h['peak_ratio']:.0f}% on {h['peak_date']})"
+                )
+            else:
+                holding_lines.append(
+                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
+                    f"(still in combat posture)"
+                )
+        fields.append({
+            "name": "🟠 Holding at high readiness",
+            "value": (
+                "_Previously mobilised, no fresh activity, but still elevated. "
+                "A daily reminder, not a new warning._\n"
+                + "\n".join(holding_lines)
+            ),
             "inline": False,
         })
 
@@ -1576,6 +1604,21 @@ def main():
     now = datetime.now(timezone.utc)
     state = load_state()
     state = migrate(state)
+
+    # Staleness watchdog: if the previous run completed much longer ago than
+    # the 3h cadence, runs were missed. Fire once on the run that resumes.
+    # Can't catch a fully-dead scheduler (no run executes to send it), but
+    # flags the gap as soon as runs come back.
+    prev_run = parse_iso(state.get("last_run"))
+    if prev_run is not None:
+        gap_h = (now - prev_run).total_seconds() / 3600
+        if gap_h >= STALE_RUN_HOURS:
+            send_health_alert(
+                f"Monitoring gap: the previous run completed **{gap_h:.0f} hours "
+                f"ago**. Runs are scheduled every 3 hours, so one or more were "
+                f"missed. This run is proceeding normally; just flagging the gap."
+            )
+
     countries = fetch_countries()
     regions = fetch_regions()
     ireland = fetch_ireland()
@@ -1851,19 +1894,25 @@ def main():
                 "peak_date": peak_date,
                 "reason": reason,
             })
+            # Stay in flagged_last_run so we keep watching, even though
+            # holding no longer triggers the per-run digest.
             current_flagged_ids.add(cid)
 
     # ---- Posture overview: once per UTC day, on the first run at or
     # after 21:00 (the last scheduled 3-hourly run of the day). Tracked
     # by date so a manual workflow_dispatch can't double-post, and only
-    # recorded if the post succeeds so a failed webhook retries next run. ----
+    # recorded if the post succeeds so a failed webhook retries next run.
+    # Carries holding + the daily "all quiet" heartbeat. ----
     today = now.strftime("%Y-%m-%d")
     if now.hour >= 21 and state.get("last_posture_date") != today:
-        if send_posture_digest(snapshots, state, active_war_ids, country_name, watchlist, now):
+        if send_posture_digest(snapshots, state, active_war_ids, country_name,
+                               watchlist, holding, flagged, stood_down, now):
             state["last_posture_date"] = today
 
-    if flagged or stood_down or holding:
-        send_digest(flagged, stood_down, holding, now)
+    # Per-run digest posts only on fresh flags or stand-downs, never on
+    # holding alone.
+    if flagged or stood_down:
+        send_digest(flagged, stood_down, now)
 
     state["version"] = STATE_VERSION
     state["last_run"] = now.isoformat()
