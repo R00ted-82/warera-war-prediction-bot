@@ -45,7 +45,7 @@ The bot watches several independent signals. A single country can trip multiple 
 When a country that was flagged last run produces no fresh signal this run, the bot doesn't just drop it. It decides between two outcomes:
 
 - **Standing down (✅).** Combat focus has fallen meaningfully from the peak recorded while the country was flagged, and now sits below the combat-posture ceiling. Reported as de-escalating.
-- **Holding at high readiness (🟠).** No new activity, but combat posture is still elevated, or Ireland is actively at war with the country. These stay on watch and are reported as a reminder, not a fresh warning. This keeps a mobilised-but-quiet country (ratio plateaued, war ongoing) from being wrongly declared a stand-down.
+- **Holding at high readiness (🟠).** No new activity, but combat posture is still elevated, or Ireland is actively at war with the country. These stay on watch and are reported as a reminder, not a fresh warning. This keeps a mobilised-but-quiet country (ratio plateaued, war ongoing) from being wrongly declared a stand-down. Holding is reported only in the daily posture report, not the per-run digest, so a country that stays mobilised but quiet doesn't re-trigger an alert every 3 hours.
 
 Low-severity items (yellow creep, single-rebuild intents that cleared the corroboration gate) roll up into one "Minor activity" line in the digest rather than each taking a full field.
 
@@ -56,6 +56,8 @@ Once a day, the 📊 overview shows where the whole watchlist sits on the war-vs
 - **Headline split.** How many countries are war-posture vs economy-posture, a red/green bar, and the average combat focus across the watchlist.
 - **Four tiers.** Heavy combat (70%+), combat-leaning (50-70%), mixed (30-50%), economy-focused (under 30%), each listing its member countries with their combat percentages. Countries Ireland is at war with carry a ⚔️ marker.
 - **Biggest movers.** The largest 7-day shifts toward war and toward economy. Countries with under a week of history don't appear here.
+- **Holding at high readiness.** Countries that were mobilised, have gone quiet, but are still elevated. This reminder lives here, once a day, rather than in the per-run digest, so it doesn't repeat every 3 hours.
+- **Daily heartbeat.** The report opens with a one-line status, "All quiet today" when nothing fired, or a brief count of the day's signals. Since it always posts at 21:00, it doubles as confirmation the bot ran.
 
 It's gated to one post per day on the first run at or after 21:00 UTC, tracked by date so a manual trigger can't double-post.
 
@@ -84,14 +86,13 @@ What the messages look like in Discord. Wording leads with the plain event, and 
 
 > 🟠 **Iceland** — 2 of this country's top players have just rebuilt into combat builds, each now putting about 90% of their skill points on combat. Several people moving the same way is an early sign of mobilisation.
 
-**The bundled daily digest** (posts on any run where something fired):
+**The bundled daily digest** (posts on any run where something fired; holding countries are not here, they're in the posture report):
 
 > **🛡️ War Watch · Daily Digest**
-> **1** urgent, **2** preparing, **1** minor, **1** holding, **2** standing down (7 total).
+> **1** urgent, **1** preparing, **1** minor, **1** standing down, **1** no longer flagged (5 total).
 > 🔴 **France** — 18 of the top 50 players (36%) wiped and rebuilt. 14 of them rebuilt into combat builds, putting 88% of their points into combat. Concrete sign of war prep.
 > 🟠 **Lithuania** — Significant combat shift (mobilising): the typical top player's combat focus climbed from 40% to 81% over the past 7 days.
 > 🟡 **Minor activity** — *soft signals, below threshold:* Germany (drifting toward combat)
-> 🟠 **Holding at high readiness** — *previously mobilised, quiet now, still elevated:* Sweden, 84% combat focus (peaked 89% on May 26)
 > 🟢 **Morocco** — 3 of the top 50 players (6%) wiped and rebuilt, and they moved toward economy, not war. Good news for Ireland.
 > ✅ **No longer flagged** — Belgium, combat focus dropped 58% to 0% (de-escalating)
 
@@ -195,6 +196,10 @@ Delete `war_state.json` to reset baselines. The first ~5 runs after that will re
 Runs every 3 hours via GitHub Actions cron (`0 */3 * * *`), at 00:00, 03:00, … 21:00 UTC. At this cadence the worst-case lag between an event and an alert is ~3 hours and the average is ~1.5 hours. The per-country cooldowns prevent spam regardless of cadence. The posture overview is gated to the first run at or after 21:00 so it lands once a day.
 
 The workflow has a concurrency group, so two runs can't race on the state file.
+
+### Heartbeat and missed runs
+
+Two things confirm the bot is alive. The daily posture report opens with an "all quiet" line on calm days, so a healthy run is visible once a day even when nothing fires. And a staleness watchdog at the start of each run compares against the previous `last_run`: if it's older than `STALE_RUN_HOURS` (default 9, about three missed 3-hour runs), it posts a degraded-health alert and then proceeds normally. Lower `STALE_RUN_HOURS` toward 6-7 to catch a single missed run. The watchdog can only fire on a run that actually executes, so it flags a gap once runs resume rather than the instant the scheduler dies; true dead-man coverage would need an external pinger.
 
 ## Known gaps
 
