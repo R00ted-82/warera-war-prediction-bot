@@ -1,12 +1,14 @@
 # warera-war-alert
 
-Discord bot that watches War Era for countries gearing up for war against Ireland (and ones that are visibly standing down). Every six hours, samples each watchlisted country's top active citizens for skill resets and shifts in combat-vs-economy skill allocation. Posts a digest embed when something looks worth knowing, plus dedicated alerts for high-severity events.
+Discord bot that watches War Era for countries gearing up for war against Ireland (and ones that are visibly standing down). Every three hours, samples each watchlisted country's top active citizens for skill resets and shifts in combat-vs-economy skill allocation. Posts a digest embed when something looks worth knowing, plus dedicated alerts for high-severity events. Once a day, posts a posture overview of how the whole watchlist splits between war and economy footing.
 
 Sibling of [`warera-tools-ireland`](https://github.com/to-ie/warera-tools-ireland) — same proxy, same Discord style, separate repo for focus.
 
 ## What you'll see
 
 Every run posts at most one **daily digest** embed listing flagged countries. The digest leads with a short explainer (sample = top ~25 active fighters, "combat focus" = share of skill points on combat) so first-time readers aren't guessing.
+
+Once a day, on the last scheduled run, the bot also posts a **posture overview** embed — a standing picture of the watchlist regardless of whether anything is flagged. See [Posture overview](#posture-overview) below.
 
 In addition, certain events get their own dedicated alert message so they don't get lost in the digest.
 
@@ -20,6 +22,7 @@ In addition, certain events get their own dedicated alert message so they don't 
 | 🟢 | Country is standing down — reassuring |
 | 🕊️ | Dedicated stand-down alert — strong de-escalation signal |
 | ✅ | Country no longer flagged since last run |
+| 📊 | Daily posture overview — informational, not an alert |
 
 Red is always danger to Ireland. Green is always reassurance. Yellow/orange sit on the mobilisation spectrum between them.
 
@@ -29,13 +32,32 @@ The bot watches five independent signals. A single country can trip multiple sig
 
 **Reset bursts.** A clutch of citizens wiping and rebuilding their skills in a single day. Skill resets cost gold, so a burst is rarely casual. Fires at ≥4 resets even with no baseline; once a country has history, it also fires at 2σ above the country's own (outlier-filtered) baseline.
 
-**Combat-intent resets.** Even one or two resets count, *if* the citizens who reset clearly rebuilt as combat fighters (≥70% combat allocation). Catches early-stage mobilisation in normally-quiet countries.
+**Combat-intent resets.** Resets that clearly rebuilt as combat fighters (≥70% combat allocation). Fires at two or more such resets in a run, or a single one when it's corroborated by an upward 7-day ratio shift of at least 5 points. The corroboration requirement stops lone resetters in quiet countries from generating noise.
 
 **Ratio creep / major combat shift.** The typical citizen's combat focus has risen significantly over the past day (≥30 points) or week (≥20 points). Tiered by magnitude: yellow at 20-40, orange at 40-60, red at 60+ (with dedicated alert).
 
 **Ratio collapse / standing down.** Mirror of the above on the green side. The typical citizen's combat focus has dropped significantly. Dedicated 🕊️ alert at 50+ point drops.
 
-**Eco-intent resets.** Mirror of combat-intent. Even one or two resets that rebuilt as workers (≤30% combat) flags as demobilising.
+**Eco-intent resets.** Mirror of combat-intent. Resets that rebuilt as workers (≤30% combat) flag as demobilising — two or more in a run, or a single one corroborated by a downward 7-day ratio shift.
+
+### Flagged, holding, or stood down
+
+When a country that was flagged last run produces no fresh signal this run, the bot doesn't just drop it. It decides between two outcomes:
+
+- **Standing down (✅).** Combat focus has fallen meaningfully from the peak recorded while the country was flagged, and now sits below the combat-posture ceiling. Reported as de-escalating.
+- **Holding at high readiness (🟠).** No new activity, but combat posture is still elevated, or Ireland is actively at war with the country. These stay on watch and are reported as a reminder, not a fresh warning. This is what keeps a mobilised-but-quiet country (ratio plateaued, war ongoing) from being wrongly declared a stand-down.
+
+Low-severity items (yellow creep, single-resetter intents that cleared the corroboration gate) roll up into one "Minor activity" line in the digest rather than each taking a full field.
+
+## Posture overview
+
+Once a day, the 📊 overview shows where the whole watchlist sits on the war-vs-economy spectrum, independent of any alerts:
+
+- **Headline split.** How many countries are war-posture vs economy-posture, a red/green bar, and the average combat focus across the watchlist.
+- **Four buckets.** War footing (≥70% combat), combat-leaning (50-70%), mixed (30-50%), economy-focused (<30%), each listing its member countries with their combat percentages. Countries Ireland is at war with carry a ⚔️ marker.
+- **Biggest movers.** The largest 7-day shifts toward war and toward economy. Countries with under a week of history don't appear here.
+
+It's gated to one post per day on the first run at or after 21:00 UTC, tracked by date so a manual trigger can't double-post.
 
 ## Who it watches
 
@@ -68,12 +90,12 @@ Combat skills: `attack`, `precision`, `dodge`, `armor`, `lootChance`, `criticalC
 |---|---|
 | Reset burst (absolute floor) | ≥4 resets in one run, always |
 | Reset burst (σ-based) | ≥2σ above outlier-filtered rolling baseline (5+ runs of history) |
-| Combat-intent reset | ≥1 reset with resetter combat ≥70% |
+| Combat-intent reset | ≥2 resets with resetter combat ≥70%, or 1 plus a +5pt 7-day ratio shift |
 | Ratio creep (yellow) | ratio gained 20-40 points in 7d, or 30+ in 1d |
 | Ratio creep (orange) | ratio gained 40-60 points in 7d, or equivalent 1d |
 | Ratio creep (red) | ratio gained 60+ points in 7d, or equivalent 1d → dedicated alert |
 | Ratio collapse (green) | mirror of creep on the falling side, ≥50 points → dedicated alert |
-| Eco-intent reset | ≥1 reset with resetter combat ≤30% |
+| Eco-intent reset | ≥2 resets with resetter combat ≤30%, or 1 plus a -5pt 7-day ratio shift |
 
 Bursts at 1.5× their threshold OR 10+ absolute resets trigger a dedicated "War Preparation Detected" alert. Red-tier ratio creep triggers a dedicated "Major Combat Shift" alert. 50+ point drops trigger "Standing Down" alerts.
 
@@ -85,7 +107,7 @@ A country's own past mobilisations are excluded from its rolling baseline (any d
 
 ### History length
 
-The rolling history keeps `HISTORY_LEN = 56` entries per country. At the 6-hour cron cadence, that's ~14 days of context. If you change the cron cadence, scale `HISTORY_LEN` accordingly (`days_of_context × runs_per_day`).
+The rolling history keeps `HISTORY_LEN = 56` entries per country. At the 3-hour cron cadence, that's ~7 days of context. If you want the previous ~14 days of context back, set `HISTORY_LEN = 112`. If you change the cron cadence again, scale it accordingly (`days_of_context × runs_per_day`). Note the 7-day ratio comparisons used by creep, collapse, and the posture movers need at least a week of history to fire, so don't drop `HISTORY_LEN` below one week's worth of runs.
 
 ## Setup
 
@@ -93,7 +115,7 @@ The rolling history keeps `HISTORY_LEN = 56` entries per country. At the 6-hour 
 2. **Discord webhook.** New channel for war alerts. Channel settings → Integrations → Webhooks → copy URL.
 3. **GitHub secret.** Settings → Secrets and variables → Actions. Name `WAR_DISCORD_WEBHOOK_URL`, value = webhook URL.
 4. **First run.** Actions → "War preparation alert" → Run workflow. Takes 3-5 minutes, then commits `war_state.json`.
-5. **First day is calmer than before.** With the always-on absolute floor, you'll see real mobilisations from run 1, but the σ-based baseline detector still needs ~5 runs (~30 hours at 6h cadence) before it engages. False positives drop further after that.
+5. **First day is calmer than before.** With the always-on absolute floor, you'll see real mobilisations from run 1, but the σ-based baseline detector still needs ~5 runs (~15 hours at 3h cadence) before it engages. False positives drop further after that.
 
 ## Tuning
 
@@ -110,21 +132,26 @@ Constants at the top of `war_alert.py`. The ones you'll most likely touch:
 | `HIGH_DEMOB_FOR_ALERT` | 50.0 | Drop that triggers dedicated standdown alert |
 | `COMBAT_INTENT` | 70.0 | Resetter combat % counted as "rebuilt as combat fighter" |
 | `DEMOB_RESET_INTENT` | 30.0 | Resetter combat % counted as "rebuilt as worker" |
+| `STAND_DOWN_RATIO_CEILING` | 50.0 | Combat focus above this counts as still in posture, not stood down |
+| `STAND_DOWN_DROP_MIN` | 15.0 | Drop from flagged peak needed to call a country stood down |
+| `POSTURE_WAR` | 70.0 | War-footing threshold in the posture overview |
+| `POSTURE_LEAN` | 50.0 | Combat-leaning threshold in the posture overview |
+| `POSTURE_MOVER_MIN` | 5.0 | Minimum 7-day shift to list a country as a mover |
 | `MIN_LEVEL` | 20 | Minimum citizen level to include in sampling |
 | `URGENT_COOLDOWN_DAYS` | 3 | Per-country cooldown between repeat urgent alerts |
-| `HISTORY_LEN` | 56 | Rolling history entries per country (~14 days at 6h cadence) |
+| `HISTORY_LEN` | 56 | Rolling history entries per country (~7 days at 3h cadence) |
 
 ## State
 
-`war_state.json` lives in the repo and is auto-committed every run. Holds per-country aggregate snapshots with rolling history, cached citizen IDs for fast next-run sampling, and cooldown timestamps for each alert type. Stays well under 1MB.
+`war_state.json` lives in the repo and is auto-committed every run. Holds per-country aggregate snapshots with rolling history, cached citizen IDs for fast next-run sampling, cooldown timestamps for each alert type, the peak combat ratio recorded while a country was flagged (for the stand-down vs holding decision), and the date of the last posture overview. Stays well under 1MB.
 
-The state file is migrated automatically on first run after a schema change — current version is v5. Migrations are idempotent.
+The state file is migrated automatically on first run after a schema change — current version is v6, which added flagged-peak tracking. Migrations are idempotent.
 
 Delete `war_state.json` to reset baselines. The first ~5 runs after that will rely on the absolute floor only.
 
 ## Schedule
 
-Runs every 6 hours via GitHub Actions cron (`0 */6 * * *`). At this cadence, the worst-case lag between an event and an alert is ~6 hours and the average is ~3 hours. Bump to `*/3` or `*/2` if you want it tighter; the per-country cooldowns prevent spam regardless of cadence.
+Runs every 3 hours via GitHub Actions cron (`0 */3 * * *`), at 00:00, 03:00, … 21:00 UTC. At this cadence, the worst-case lag between an event and an alert is ~3 hours and the average is ~1.5 hours. The per-country cooldowns prevent spam regardless of cadence. The posture overview is gated to the first run at or after 21:00 so it lands once a day.
 
 The workflow has a concurrency group, so two runs can't race on the state file.
 

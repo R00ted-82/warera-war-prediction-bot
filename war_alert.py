@@ -1314,10 +1314,11 @@ def _posture_bucket(ratio):
     return "eco"
 
 
-def send_posture_digest(snapshots, state, active_war_ids, country_name, now):
-    """Informational overview of how the watchlist splits between war and
-    economy posture this run, plus the largest 7d shifts in either
-    direction. Sent every run, independent of whether anything is flagged.
+def send_posture_digest(snapshots, state, active_war_ids, country_name, watchlist, now):
+    """End-of-day report: every monitored country sorted into a war side
+    and an economy side, with a per-tier breakdown and the week's biggest
+    movers. Also reports monitored-vs-sampled counts and names any country
+    that couldn't be read this run. Sent once a day, independent of alerts.
     """
     rows = []
     for cid, snap in snapshots.items():
@@ -1333,53 +1334,78 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name, now):
             "at_war": cid in active_war_ids,
         })
 
+    monitored = len(watchlist) if watchlist else len(rows)
+    sampled = len(rows)
+    skipped = sorted(
+        (country_name.get(cid) or cid)
+        for cid in (watchlist or {})
+        if cid not in snapshots
+    )
+
     if not rows:
-        return False
+        embed = {
+            "title": "📊 War Watch · Daily Posture Report",
+            "color": COLOUR_DIGEST,
+            "description": (
+                f"Monitoring **{monitored}** countries, but none could be "
+                f"sampled this run, so there's no posture data to show. This "
+                f"usually means the data proxy was down during the run."
+            ),
+            "timestamp": now.isoformat(),
+        }
+        return safe_post(embed, "posture digest")
 
     buckets = {"war": [], "leaning": [], "balanced": [], "eco": []}
     for r in rows:
         buckets[r["bucket"]].append(r)
 
-    total = len(rows)
     war_side = len(buckets["war"]) + len(buckets["leaning"])
     eco_side = len(buckets["balanced"]) + len(buckets["eco"])
 
     bar_len = 20
-    war_blocks = round((war_side / total) * bar_len) if total else 0
+    war_blocks = round((war_side / sampled) * bar_len) if sampled else 0
     eco_blocks = bar_len - war_blocks
     split_bar = "🟥" * war_blocks + "🟩" * eco_blocks
 
     avg_ratio = statistics.mean(r["ratio"] for r in rows)
 
+    scope = (
+        f"**{sampled} countries**"
+        if sampled == monitored
+        else f"**{sampled} of {monitored} monitored countries** (rest had too "
+             f"few active players to read)"
+    )
     description = (
-        f"Across **{total}** monitored countries, the watchlist leans "
-        f"**{war_side} war-posture vs {eco_side} economy-posture**. "
-        f"Average combat focus is **{avg_ratio:.0f}%**.\n\n"
+        f"How {scope} are split right now, by what their top fighters are "
+        f"built for. \"Combat focus\" is the share of skill points a typical "
+        f"top fighter spends on combat skills rather than economy.\n\n"
+        f"⚔️ **War footing: {war_side}**     🌾 **Economy footing: {eco_side}**\n"
         f"{split_bar}\n"
-        f"_war ← → eco_"
+        f"Average combat focus: **{avg_ratio:.0f}%**\n"
+        f"_⚔️ next to a country means Ireland is currently at war with it._"
     )
 
-    def _fmt_country(r):
-        tag = " ⚔️" if r["at_war"] else ""
-        return f"{r['name']} ({r['ratio']:.0f}%){tag}"
+    def _country_line(r):
+        tag = "   ⚔️" if r["at_war"] else ""
+        return f"**{r['name']}** · {r['ratio']:.0f}% combat focus{tag}"
 
     fields = []
-
-    bucket_meta = [
-        ("war", "🔴 War footing (≥70% combat)"),
-        ("leaning", "🟠 Combat-leaning (50-70%)"),
-        ("balanced", "🟡 Mixed (30-50%)"),
-        ("eco", "🟢 Economy-focused (<30%)"),
+    tier_meta = [
+        ("war", "🔴 Heavy combat · 70% and up (war-ready)"),
+        ("leaning", "🟠 Combat-leaning · 50 to 70%"),
+        ("balanced", "🟡 Mixed · 30 to 50%"),
+        ("eco", "🟢 Economy-focused · under 30%"),
     ]
-    for key, label in bucket_meta:
+    for key, label in tier_meta:
         members = sorted(buckets[key], key=lambda r: -r["ratio"])
         if not members:
             continue
-        names = ", ".join(_fmt_country(r) for r in members[:15])
-        more = f" (+{len(members) - 15} more)" if len(members) > 15 else ""
+        lines = "\n".join(_country_line(r) for r in members[:20])
+        if len(members) > 20:
+            lines += f"\n_…and {len(members) - 20} more_"
         fields.append({
-            "name": f"{label} — {len(members)}",
-            "value": names + more,
+            "name": f"{label}   ({len(members)})",
+            "value": lines,
             "inline": False,
         })
 
@@ -1393,27 +1419,34 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name, now):
         key=lambda r: r["shift_7d"],
     )[:5]
 
+    def _mover_line(r):
+        was = r["ratio"] - r["shift_7d"]
+        return f"**{r['name']}** · {was:.0f}% → {r['ratio']:.0f}% combat focus this week"
+
     if risers:
         fields.append({
-            "name": "📈 Shifting toward war (7d)",
-            "value": "\n".join(
-                f"**{r['name']}** +{r['shift_7d']:.0f}pp → {r['ratio']:.0f}% combat"
-                for r in risers
-            ),
+            "name": "📈 Building up (shifted toward war this week)",
+            "value": "\n".join(_mover_line(r) for r in risers),
             "inline": False,
         })
     if fallers:
         fields.append({
-            "name": "📉 Shifting toward economy (7d)",
-            "value": "\n".join(
-                f"**{r['name']}** {r['shift_7d']:.0f}pp → {r['ratio']:.0f}% combat"
-                for r in fallers
-            ),
+            "name": "📉 Winding down (shifted toward economy this week)",
+            "value": "\n".join(_mover_line(r) for r in fallers),
+            "inline": False,
+        })
+
+    if skipped:
+        shown = ", ".join(skipped[:15])
+        more = f" (+{len(skipped) - 15} more)" if len(skipped) > 15 else ""
+        fields.append({
+            "name": f"⚪ Couldn't read · too few active players   ({len(skipped)})",
+            "value": shown + more,
             "inline": False,
         })
 
     embed = {
-        "title": "📊 War Watch · Posture Overview",
+        "title": "📊 War Watch · Daily Posture Report",
         "color": COLOUR_DIGEST,
         "description": description,
         "fields": fields,
@@ -1735,7 +1768,7 @@ def main():
     # next run rather than silently skipping the day. ----
     today = now.strftime("%Y-%m-%d")
     if now.hour >= 21 and state.get("last_posture_date") != today:
-        if send_posture_digest(snapshots, state, active_war_ids, country_name, now):
+        if send_posture_digest(snapshots, state, active_war_ids, country_name, watchlist, now):
             state["last_posture_date"] = today
 
     if flagged or stood_down or holding:
