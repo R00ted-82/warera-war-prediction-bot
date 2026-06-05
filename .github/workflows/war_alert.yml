@@ -2,10 +2,7 @@ name: War preparation alert
 
 on:
   schedule:
-    # Every 6 hours at :00. UTC. Picks up mobilisations within hours
-    # rather than a day late. The bot has per-country cooldowns so
-    # urgent alerts won't re-spam — see URGENT_COOLDOWN_DAYS in war_alert.py.
-    - cron: '0 */6 * * *'
+    - cron: '0 */3 * * *'
   workflow_dispatch:
 
 # Prevents two runs from racing on war_state.json if a scheduled run

@@ -1728,8 +1728,15 @@ def main():
             })
             current_flagged_ids.add(cid)
 
-    # ---- Posture overview (always, independent of alerts) ----
-    send_posture_digest(snapshots, state, active_war_ids, country_name, now)
+    # ---- Posture overview: once per UTC day, on the first run at or
+    # after 21:00 (the last scheduled 3-hourly run of the day). Tracked
+    # by date so a manual workflow_dispatch can't double-post, and only
+    # recorded if the post actually succeeds so a failed webhook retries
+    # next run rather than silently skipping the day. ----
+    today = now.strftime("%Y-%m-%d")
+    if now.hour >= 21 and state.get("last_posture_date") != today:
+        if send_posture_digest(snapshots, state, active_war_ids, country_name, now):
+            state["last_posture_date"] = today
 
     if flagged or stood_down or holding:
         send_digest(flagged, stood_down, holding, now)
