@@ -59,6 +59,44 @@ Once a day, the 📊 overview shows where the whole watchlist sits on the war-vs
 
 It's gated to one post per day on the first run at or after 21:00 UTC, tracked by date so a manual trigger can't double-post.
 
+## Example alerts
+
+What the messages actually look like in Discord. Wording leads with the plain event; percentages are always labelled as combat focus so nothing floats free.
+
+**Reset burst** (high severity, its own message):
+
+> **⚠️ War Preparation Detected: Norway**
+> **8 of the top 25 fighters** (32%) wiped and rebuilt their skills since the last check. Rebuilding costs gold, so a cluster like this usually means people are repurposing themselves, typically for combat. This country normally sees about 1 per day.
+> *Who this tracks:* the top 25 active fighters (level 20+, online in the last 14 days).
+> *Where they stand now:* the typical one has put 72% of their skill points into combat (the other 28% on economy).
+> *What the rebuilders chose:* 6 of them rebuilt into a combat build, the typical rebuild is heavily combat-focused (88% combat).
+
+**Major combat shift** (red creep, its own message):
+
+> **⚠️ Major Combat Shift: France**
+> The top fighters in France have made a big move toward combat. Their typical combat focus went from **18% to 81%** over the past 7 days (a 63-point jump). This looks like a finished rebuild rather than today's activity, so they may already be war-ready rather than still preparing.
+
+**Standing down** (big collapse, its own message):
+
+> **🕊️ Standing Down: Belgium**
+> The top fighters in Belgium are clearly easing off war. Their typical combat focus dropped from **58% to 0%** over the past 7 days, moving skill points back into economy. This usually means a campaign is wrapping up. **Likely no longer an immediate threat.**
+
+**Combat-intent and eco-intent resets** appear as lines inside the daily digest rather than as their own messages:
+
+> 🟠 **Italy** — 2 fighters among the top 25 just rebuilt into a combat build (89% of their skill points now on combat). Several people moving the same way is an early sign of mobilisation.
+>
+> 🟢 **United States** — 2 fighters among the top 25 just rebuilt into an economy build (0% of their skill points on combat, the rest on economy). People moving back to economy is an early sign they're standing down.
+
+**The bundled daily digest** (posts on any run where something fired):
+
+> **🛡️ War Watch · Daily Digest**
+> **1** urgent, **2** preparing, **1** minor, **1** holding, **1** standing down (6 total).
+> 🔴 **Norway** — 8 of the top 25 fighters (32%) wiped and rebuilt. Of those, 6 rebuilt into combat builds (88% combat). Concrete sign of war prep.
+> 🟠 **France** — Significant combat shift (mobilising): the typical top fighter's combat focus climbed from 40% to 81% over the past 7 days.
+> 🟡 **Minor activity** — *soft signals, below threshold:* Germany (drifting toward combat)
+> 🟠 **Holding at high readiness** — *previously mobilised, quiet now, still elevated:* Lithuania, 88% combat (peaked 89% on May 26)
+> ✅ **No longer flagged** — Belgium, combat focus dropped 58% to 0% (de-escalating)
+
 ## Who it watches
 
 The bot doesn't monitor every country in the game — only those that pose a credible threat. The watchlist rebuilds every run from two sources:

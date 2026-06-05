@@ -3,30 +3,25 @@ War preparation alert bot.
 
 Patch summary (this version):
 
-  * FIX: _find_history_point now ages the matched point relative to
-    `now`, not relative to `target`. The old version measured age from
-    target (which is already now - 7d), so points near the 7-day mark
-    came out with age ~0 and were rejected by the min_age guard. That
-    silently killed every ratio creep / collapse / corroboration signal.
-    Signature is now _find_history_point(history, target, now,
-    min_age_days); all three call sites updated.
+  * FIX: _find_history_point ages the matched point relative to `now`,
+    not `target`. Signature is _find_history_point(history, target, now,
+    min_age_days); all three call sites pass `now`.
+  * NEW: send_posture_digest — end-of-day report splitting every
+    monitored country into a war side and an economy side, with movers.
+    Gated to one post per day on the first run at or after 21:00 UTC.
+  * Plain-language alert wording throughout (no "X of Y citizens (of N
+    sampled)" stacking; percentages always labelled as combat focus).
+  * DIAGNOSTIC: find_border_countries prints region/border counts to
+    stderr so a silently-shrunk watchlist is visible in the run log.
 
-  * NEW: send_posture_digest — an informational overview sent each run
-    showing how the watchlist splits between war-posture and
-    economy-posture countries, average combat focus, per-bucket
-    membership, and the biggest 7-day movers in each direction.
-
-Earlier changes (unchanged here):
-
-  1. ECO_INTENT requires eco_resets >= 2, OR eco_resets >= 1 with a
-     corroborating ratio drop.
+Earlier behaviour (unchanged):
+  1. ECO_INTENT requires eco_resets >= 2, OR 1 with a corroborating drop.
   2. COMBAT_INTENT tightened symmetrically.
-  3. Stand-down detection compares against a recorded flagged peak;
-     Norway-style plateaus report as "holding at high readiness".
+  3. Stand-down vs holding decided against a recorded flagged peak.
   4. Low-severity items roll up into one "Minor activity" line.
 
-State fields: last_flagged_peak_ratio, last_flagged_at. STATE_VERSION 6
-with idempotent migration.
+State fields: last_flagged_peak_ratio, last_flagged_at, last_posture_date.
+STATE_VERSION 6 with idempotent migration.
 """
 
 import json
@@ -115,7 +110,7 @@ HEALTH_SNAPSHOT_RATE = 0.5
 COLOUR_RESET_BURST = 0xED4245
 COLOUR_RATIO_CREEP = 0xFEE75C
 COLOUR_DEMOB = 0x57F287
-COLOUR_HOLDING = 0xFAA61A          # orange — informational, not green
+COLOUR_HOLDING = 0xFAA61A          # orange, informational, not green
 COLOUR_DIGEST = 0x5865F2
 COLOUR_HEALTH_WARN = 0xFEE75C
 COLOUR_HEALTH_CRIT = 0xED4245
@@ -147,7 +142,7 @@ def trpc(endpoint, payload=None, attempt=1):
             )
             if any(s in msg.lower() for s in transient):
                 raise requests.exceptions.RequestException(f"transient: {msg}")
-            raise RuntimeError(f"{endpoint} → {msg[:120]}")
+            raise RuntimeError(f"{endpoint} -> {msg[:120]}")
         return data.get("result", {}).get("data")
     except (requests.exceptions.RequestException, json.JSONDecodeError):
         if attempt < RETRY_ATTEMPTS:
@@ -187,6 +182,12 @@ def find_border_countries(regions_obj, country_id, max_hops=None):
         and r.get("country") == country_id
         and r.get("_id")
     }
+    # Diagnostic: surfaces a silently-shrunk watchlist. "regions fetched: 0"
+    # means the proxy call failed; ">0 fetched but 0 Ireland matched" means
+    # the country ID or Ireland's territory changed; ">0 matched but 0
+    # border countries" means the neighbor/country field shape changed.
+    print(f"  [debug] regions fetched: {len(regions_obj)}, "
+          f"Ireland regions matched: {len(own_ids)}", file=sys.stderr)
     visited = set(own_ids)
     frontier = set(own_ids)
     borders = {}
@@ -215,6 +216,8 @@ def find_border_countries(regions_obj, country_id, max_hops=None):
             break
         frontier = next_frontier
 
+    print(f"  [debug] border countries within {max_hops} hops: {len(borders)}",
+          file=sys.stderr)
     return borders
 
 
@@ -499,10 +502,10 @@ def _find_history_point(history, target, now, min_age_days):
     """Return the history point closest to `target`, but only if it is at
     least `min_age_days` old relative to `now`.
 
-    NB: age is measured from `now`, not from `target`. `target` is itself
-    a past time (e.g. now - 7d), so ageing from target would make a point
-    sitting right on the lookback mark look brand new and get rejected —
-    which is exactly the bug that previously silenced all ratio signals.
+    Age is measured from `now`, not from `target`. `target` is itself a
+    past time (e.g. now - 7d), so ageing from target would make a point
+    sitting right on the lookback mark look brand new and get rejected,
+    which is the bug that previously silenced all ratio signals.
     """
     if not history:
         return None
@@ -515,8 +518,7 @@ def _find_history_point(history, target, now, min_age_days):
 
 def _ratio_shift_7d(history, current_ratio, now):
     """Signed 7d ratio delta if we have a usable comparison point, else
-    None. Used as corroboration for single-resetter intent and for the
-    posture overview's mover lists.
+    None. Used for single-resetter corroboration and posture movers.
     """
     pt = _find_history_point(
         history, now - timedelta(days=RATIO_LOOKBACK_DAYS), now,
@@ -528,9 +530,7 @@ def _ratio_shift_7d(history, current_ratio, now):
 
 
 def detect_combat_intent_resets(snap, history, now):
-    """Returns dict if resets this run point at war prep.
-
-    Fires when EITHER combat_resets >= COMBAT_INTENT_MIN_RESETTERS, OR
+    """Fires when combat_resets >= COMBAT_INTENT_MIN_RESETTERS, or
     combat_resets >= 1 with a corroborating upward 7d ratio shift.
     """
     combat_resets = snap.get("combat_resets", 0)
@@ -712,7 +712,7 @@ def migrate(state):
             country.setdefault("last_urgent_count", None)
         state.setdefault("flagged_last_run", [])
         state["version"] = 4
-        print("Migrated state v3 → v4.")
+        print("Migrated state v3 -> v4.")
 
     if version < 5:
         for country in state.get("countries", {}).values():
@@ -723,14 +723,14 @@ def migrate(state):
             country.setdefault("last_creep_alert", None)
             country.setdefault("last_creep_delta", None)
         state["version"] = 5
-        print("Migrated state v4 → v5.")
+        print("Migrated state v4 -> v5.")
 
     if version < 6:
         for country in state.get("countries", {}).values():
             country.setdefault("last_flagged_at", None)
             country.setdefault("last_flagged_peak_ratio", None)
         state["version"] = 6
-        print("Migrated state v5 → v6 (added flagged-peak tracking).")
+        print("Migrated state v5 -> v6 (added flagged-peak tracking).")
 
     return state
 
@@ -758,9 +758,9 @@ def trend_field(history, snap):
     ratio_series = [h["combat_ratio"] for h in history] + [snap["combat_ratio"]]
     return (
         f"`{sparkline(reset_series)}` skill rebuilds per check "
-        f"({reset_series[0]} → {reset_series[-1]})\n"
+        f"({reset_series[0]} -> {reset_series[-1]})\n"
         f"`{sparkline(ratio_series)}` typical fighter's combat focus "
-        f"({ratio_series[0]:.0f}% → {ratio_series[-1]:.0f}%)"
+        f"({ratio_series[0]:.0f}% -> {ratio_series[-1]:.0f}%)"
     )
 
 
@@ -816,9 +816,9 @@ def send_high_severity_burst(country_name, snap, burst, history):
         baseline_clause = f"This country normally sees {normal_phrase}."
     elif burst.get("reason") == "no_baseline_floor":
         baseline_clause = (
-            f"Not enough history yet to know what's normal — but any single "
-            f"day with {NO_BASELINE_RESET_FLOOR}+ skill switches in a small "
-            f"sample is unusual."
+            f"Not enough history yet to know what's normal, but any single "
+            f"day with {NO_BASELINE_RESET_FLOOR}+ rebuilds in a small sample "
+            f"is unusual."
         )
     else:
         baseline_clause = ""
@@ -875,7 +875,6 @@ def send_high_severity_burst(country_name, snap, burst, history):
 
 
 def send_high_severity_demob(country_name, snap, collapse, history):
-    drop = abs(collapse["delta"])
     window = collapse["window_days"]
     window_text = "the past day" if window == 1 else f"the past {window} days"
 
@@ -1049,6 +1048,24 @@ def _digest_line_creep(name, snap, creep):
     return icon, name, main
 
 
+def _digest_line_collapse(name, snap, collapse):
+    icon = "🟢"
+    tier = collapse.get("tier", "green_light")
+    label = {
+        "green_strong": "Strong stand-down (campaign likely ending)",
+        "green_med": "Standing down (de-escalating)",
+        "green_light": "Easing off combat (early stand-down sign)",
+    }[tier]
+    window = collapse["window_days"]
+    window_text = "the past day" if window == 1 else f"the past {window} days"
+    main = (
+        f"{label}: the typical top fighter's combat focus fell from "
+        f"**{collapse['old_ratio']:.0f}% to {snap['combat_ratio']:.0f}%** "
+        f"over {window_text}."
+    )
+    return icon, name, main
+
+
 def _digest_line_eco_intent(name, snap, intent):
     icon = "🟢"
     n = intent["eco_resets"]
@@ -1069,41 +1086,6 @@ def _digest_line_eco_intent(name, snap, intent):
     return icon, name, main
 
 
-def _digest_line_creep(name, snap, creep):
-    tier = creep.get("tier", "yellow")
-    icon = {"red": "🔴", "orange": "🟠", "yellow": "🟡"}[tier]
-    label = {
-        "red": "Major combat shift (likely war-ready)",
-        "orange": "Significant combat shift (mobilising)",
-        "yellow": "Drifting toward combat (worth watching)",
-    }[tier]
-    window = creep["window_days"]
-    window_text = "the past day" if window == 1 else f"the past {window} days"
-    main = (
-        f"{label}: typical citizen went from **{creep['old_ratio']:.0f}% → "
-        f"{snap['combat_ratio']:.0f}% combat** over {window_text}"
-    )
-    return icon, name, main
-
-
-def _digest_line_collapse(name, snap, collapse):
-    icon = "🟢"
-    tier = collapse.get("tier", "green_light")
-    label = {
-        "green_strong": "Strong stand-down (campaign likely ending)",
-        "green_med": "Standing down (de-escalating)",
-        "green_light": "Easing off combat (early stand-down sign)",
-    }[tier]
-    window = collapse["window_days"]
-    window_text = "the past day" if window == 1 else f"the past {window} days"
-    main = (
-        f"{label}: the typical top fighter's combat focus fell from "
-        f"**{collapse['old_ratio']:.0f}% to {snap['combat_ratio']:.0f}%** "
-        f"over {window_text}."
-    )
-    return icon, name, main
-
-
 # ---------- Digest assembly with rollup and holding state ----------
 
 def _is_low_severity(flag):
@@ -1121,9 +1103,9 @@ def _minor_activity_label(flag):
     if flag["kind"] == "creep":
         return f"{name} (drifting toward combat)"
     if flag["kind"] == "combat_intent":
-        return f"{name} (1 resetter, combat-leaning)"
+        return f"{name} (1 fighter, combat-leaning)"
     if flag["kind"] == "eco_intent":
-        return f"{name} (1 resetter, eco-leaning)"
+        return f"{name} (1 fighter, eco-leaning)"
     return name
 
 
@@ -1188,7 +1170,7 @@ def send_digest(flagged, stood_down, holding, now):
         fields.append({
             "name": "🟡 Minor activity",
             "value": (
-                "_Soft signals, individually below threshold — listed "
+                "_Soft signals, individually below threshold, listed "
                 "for awareness, not action._\n"
                 + ", ".join(labels) + more
             ),
@@ -1200,26 +1182,26 @@ def send_digest(flagged, stood_down, holding, now):
         for h in sorted(holding, key=lambda x: -x["current_ratio"])[:15]:
             if h.get("reason") == "active_war":
                 line = (
-                    f"**{h['name']}** — {h['current_ratio']:.0f}% combat "
+                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
                     f"(actively at war with Ireland)"
                 )
             elif h.get("peak_date") and h["peak_date"] != "unknown":
                 line = (
-                    f"**{h['name']}** — {h['current_ratio']:.0f}% combat "
+                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
                     f"(peaked {h['peak_ratio']:.0f}% on {h['peak_date']})"
                 )
             else:
                 line = (
-                    f"**{h['name']}** — {h['current_ratio']:.0f}% combat "
+                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
                     f"(still in combat posture)"
                 )
             holding_lines.append(line)
         fields.append({
             "name": "🟠 Holding at high readiness",
             "value": (
-                "_Previously mobilised, no fresh activity this run, "
-                "but combat posture remains. Not a new warning — a "
-                "reminder these countries are still elevated._\n"
+                "_Previously mobilised, no fresh activity this run, but "
+                "combat posture remains. Not a new warning, a reminder "
+                "these countries are still elevated._\n"
                 + "\n".join(holding_lines)
             ),
             "inline": False,
@@ -1234,28 +1216,28 @@ def send_digest(flagged, stood_down, holding, now):
         for s in by_reason.get("ratio_dropped", []):
             if s.get("peak_ratio") is not None:
                 stood_down_lines.append(
-                    f"**{s['name']}** — combat focus dropped "
-                    f"{s['peak_ratio']:.0f}% → {s['current_ratio']:.0f}% "
+                    f"**{s['name']}** · combat focus dropped "
+                    f"{s['peak_ratio']:.0f}% to {s['current_ratio']:.0f}% "
                     f"(de-escalating)"
                 )
             else:
                 stood_down_lines.append(
-                    f"**{s['name']}** — de-escalating "
-                    f"(now {s['current_ratio']:.0f}% combat)"
+                    f"**{s['name']}** · de-escalating "
+                    f"(now {s['current_ratio']:.0f}% combat focus)"
                 )
 
         soft = by_reason.get("soft_flag", [])
         if soft:
             names = ", ".join(s["name"] for s in soft)
             stood_down_lines.append(
-                f"{names} — never highly mobilised; activity quieted"
+                f"{names} · never highly mobilised, activity quieted"
             )
 
         retired = by_reason.get("retired_no_data", [])
         if retired:
             names = ", ".join(s["name"] for s in retired)
             stood_down_lines.append(
-                f"{names} — previous flag retired "
+                f"{names} · previous flag retired "
                 f"(was based on signals that no longer qualify)"
             )
 
@@ -1292,7 +1274,7 @@ def send_digest(flagged, stood_down, holding, now):
 
     intro = (
         "Each line tracks the top ~25 active fighters in a country "
-        "(level 20+, recently online) — the people who actually turn up "
+        "(level 20+, recently online), the people who actually turn up "
         "to battles. \"Combat focus\" is the share of a fighter's skill "
         "points spent on combat skills rather than economy.\n\n"
     )
@@ -1440,7 +1422,7 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name, watchlis
 
     def _mover_line(r):
         was = r["ratio"] - r["shift_7d"]
-        return f"**{r['name']}** · {was:.0f}% → {r['ratio']:.0f}% combat focus this week"
+        return f"**{r['name']}** · {was:.0f}% to {r['ratio']:.0f}% combat focus this week"
 
     if risers:
         fields.append({
@@ -1488,8 +1470,7 @@ def send_health_alert(message, critical=False):
 
 def classify_post_flag_state(cid, prev_country, snap, active_war_ids):
     """Decide whether a previously-flagged country actually stood down or
-    is just holding at high readiness. See reason codes in the digest
-    renderer.
+    is just holding at high readiness.
     """
     if cid in active_war_ids:
         return ("holding", "active_war")
@@ -1783,8 +1764,7 @@ def main():
     # ---- Posture overview: once per UTC day, on the first run at or
     # after 21:00 (the last scheduled 3-hourly run of the day). Tracked
     # by date so a manual workflow_dispatch can't double-post, and only
-    # recorded if the post actually succeeds so a failed webhook retries
-    # next run rather than silently skipping the day. ----
+    # recorded if the post succeeds so a failed webhook retries next run. ----
     today = now.strftime("%Y-%m-%d")
     if now.hour >= 21 and state.get("last_posture_date") != today:
         if send_posture_digest(snapshots, state, active_war_ids, country_name, watchlist, now):
@@ -1815,3 +1795,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
