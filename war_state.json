@@ -330,6 +330,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 84.78,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
@@ -338,26 +346,26 @@
         "69036187009657975ceb4e37",
         "690510343968fc6faf89a856",
         "6916e072991d93d5d34deedb",
-        "68fb697597f7a72934bf3bc5",
         "69025adcfe0f15858fead462",
         "6919c7be99b6f95d037a8087",
-        "690631da4284de8e5e898eff",
+        "68fb697597f7a72934bf3bc5",
         "6906aa93d65e59eb3ba1a26e",
-        "68fb92ae8831416ea7684f80",
-        "69065e23e8e12c3b9ff9f06b",
-        "691756e6b6d7886e8cd3bbf3",
+        "690631da4284de8e5e898eff",
         "6902032f582da7f4b18f5902",
         "6914918a0b5348273322d176",
-        "69418fc777214006429fdbbb",
-        "6914b82c9aee34224001f473",
-        "69473a49955d216659cb3dc6",
+        "68fb92ae8831416ea7684f80",
+        "691756e6b6d7886e8cd3bbf3",
+        "69065e23e8e12c3b9ff9f06b",
         "68ff70b2ddd6dbcaaf468fc7",
+        "6914b82c9aee34224001f473",
         "69035220d2b4a4bcee5f396a",
+        "69473a49955d216659cb3dc6",
+        "69418fc777214006429fdbbb",
+        "6945a97f91014485e27161bf",
         "6945bd36a3e161cb35b91c52",
         "6945bab3ecf9f19d2f3c17f8",
-        "6945a97f91014485e27161bf",
-        "6952fad6570072bf2733c162",
-        "69064cbcf4d83281b2b9974a"
+        "69064cbcf4d83281b2b9974a",
+        "6952fad6570072bf2733c162"
       ],
       "last_creep_alert": null,
       "last_creep_delta": null,
@@ -603,14 +611,6 @@
       "combat_resets": 0,
       "eco_resets": 0,
       "history": [
-        {
-          "combat_ratio": 34.62,
-          "combat_resets": 0,
-          "eco_resets": 0,
-          "new_resets": 0,
-          "resetter_combat_ratio": null,
-          "ts": "2026-05-29T15:51:03.789679+00:00"
-        },
         {
           "combat_ratio": 36.0,
           "combat_resets": 0,
@@ -1050,34 +1050,42 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 20.83,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
         "69b3b26644d82934405e9773",
-        "69b555f43af735a9906c6486",
         "69b2db6685ba2a296ec5b128",
-        "69b2d8606157435c4f20bb70",
         "69b3c280e86aeacd8ca4a7c5",
-        "69b468aa35541608f4449c5c",
+        "69b2d8606157435c4f20bb70",
+        "69b555f43af735a9906c6486",
         "69b398b44a0b814a34ea15bf",
+        "69b468aa35541608f4449c5c",
         "69b3b708c5949dae6b26eb6d",
         "69bd3ccd2b3745eea5601700",
         "69b4ad6e6eeec30d5962d00f",
-        "69b7d116e94a969626b516f2",
-        "69b36ad04922375a1b836c84",
-        "69b46e1bb052a4f2e20ece7a",
         "69b5b0b5579ffbb5e4b27072",
+        "69b36ad04922375a1b836c84",
+        "69b7d116e94a969626b516f2",
+        "69b46e1bb052a4f2e20ece7a",
         "69bc3c6a84bbfcaa685c1e38",
-        "69bd34221348cf457e66629d",
         "69baadacf25874079e9f24d0",
-        "69c2e6575f22681ea534e7b4",
-        "69c12676ab2d54d20d2ace74",
+        "69bd34221348cf457e66629d",
         "69bcd2f22b5e4e5665f6ba17",
-        "69ba792a08ebed11edf989cf",
+        "69c12676ab2d54d20d2ace74",
+        "69c2e6575f22681ea534e7b4",
         "69bea7d4dcbd31be3aca1b98",
+        "69ba792a08ebed11edf989cf",
+        "69cec0ef476990332b9fc69e",
         "69b53ff8d8430ef797b74a56",
-        "69ceb7d7b3a3e5e779a99245",
-        "69cec0ef476990332b9fc69e"
+        "69ceb7d7b3a3e5e779a99245"
       ],
       "last_creep_alert": null,
       "last_creep_delta": null,
@@ -1301,14 +1309,6 @@
       "combat_resets": 0,
       "eco_resets": 0,
       "history": [
-        {
-          "combat_ratio": 58.33,
-          "combat_resets": 0,
-          "eco_resets": 0,
-          "new_resets": 0,
-          "resetter_combat_ratio": null,
-          "ts": "2026-05-29T15:51:03.789679+00:00"
-        },
         {
           "combat_ratio": 54.84,
           "combat_resets": 0,
@@ -1748,34 +1748,42 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 0.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
         "69b41ca244d8293440241af1",
-        "69b311efcbf2b5c108a623af",
         "69bc678d0f50f6f334a3c4aa",
-        "69b480b421a9ed4b968a4a40",
         "69b73e37805a5bf5ae2b2bdc",
-        "69b323877972e334e3bd22da",
-        "69b492545f34cb744fd46517",
-        "69b7bf95ca9a42b7ef66b7de",
+        "69b311efcbf2b5c108a623af",
+        "69b480b421a9ed4b968a4a40",
         "69ba42913f756b6d59c124e2",
+        "69b323877972e334e3bd22da",
+        "69b7bf95ca9a42b7ef66b7de",
+        "69b492545f34cb744fd46517",
         "69b85514c0dd19d33218e8d4",
         "69c4dc19cde5836cb7979931",
         "69c1b1f7585318550a94c71b",
+        "69caa9edb37e0eb78f499cff",
         "69cfd1565752aefa8b3caaca",
         "69c65cfcc1a06d6b1e74ecfd",
-        "69caa9edb37e0eb78f499cff",
-        "69d1dd763790cc0563595cc8",
         "69b46b4bb34bca57fd13eba1",
-        "69d52703216f0b15398005ac",
+        "69d1dd763790cc0563595cc8",
         "69d234d58045f16fb0054e98",
+        "69d52703216f0b15398005ac",
         "69d201035b35561b71a51593",
-        "69d218ac904e27bdee79c22c",
-        "69d7ec8324981374504dd728",
-        "69d8c35f3553eff9bdbe964f",
         "69da360ed11e8da853d42d0c",
-        "69d3f9c7a3f63f0bf110a014"
+        "69d218ac904e27bdee79c22c",
+        "69d8c35f3553eff9bdbe964f",
+        "69d3f9c7a3f63f0bf110a014",
+        "69d7ec8324981374504dd728"
       ],
       "last_creep_alert": null,
       "last_creep_delta": null,
@@ -2158,34 +2166,42 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 86.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
         "6825c9bab490ccafd670a30c",
-        "681a2f5b4c586e01fbcadba4",
         "6829c71bf9fe6076b38a5379",
+        "681a2f5b4c586e01fbcadba4",
         "68288dae95ff84572bfd0337",
         "6829f52d8c06514dc2a36f74",
         "681797320479a9ceb1902324",
-        "683083ff9a4536aed996e114",
         "682b241487f122ddeb4bacb6",
-        "6878a9c67869eb193752b6d3",
+        "683083ff9a4536aed996e114",
         "6879d778820ed429e1825ffb",
-        "6878b87a002311c68a3f3c26",
+        "6878a9c67869eb193752b6d3",
         "682f7ce98dff660fbf201ea6",
-        "6878f3592bdf9a42b590de26",
         "6878987463ae472cc7fb4f4a",
+        "6878f3592bdf9a42b590de26",
+        "6878b87a002311c68a3f3c26",
         "6878bb286097872ea4cce521",
-        "682b6bb3e65588148785878e",
         "68266beec517b26c38b8fb0a",
+        "682b6bb3e65588148785878e",
         "688c3e804f7299ac68496349",
         "68474da33194d84192e6d54c",
         "688b4b2b87390e70c372f617",
-        "690b90816fdd2d7701fe85a8",
         "6846c91929ce4e2dd13868a5",
+        "690b90816fdd2d7701fe85a8",
+        "690cff0e6fdd2d7701324045",
         "69093d5252a1251631ed1a1f",
-        "690e5a730786722cb81566d4",
-        "690cff0e6fdd2d7701324045"
+        "690e5a730786722cb81566d4"
       ],
       "last_creep_alert": null,
       "last_creep_delta": null,
@@ -2601,6 +2617,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 12.9,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
@@ -2610,22 +2634,22 @@
         "6888ed036f277792652b4a45",
         "68686d005841fc53d8673112",
         "692dd387aeb4f27c0f3a2757",
-        "691c31c69317706a74ff84fe",
         "6912b18159d39d64afbbc4f0",
+        "691c31c69317706a74ff84fe",
         "691a31f392948e91cb9d2334",
         "69619a809aa619cc592ea334",
         "6943c1cc980f402c92ce7879",
         "696d5777fe9d5e4fd70a652e",
+        "68f5dd6a22a4934adae9e491",
         "695041f32b332672a6278aff",
         "696e0aef82ecc0f3cf5d509b",
-        "68f5dd6a22a4934adae9e491",
-        "6918b289cc751d7f455cb802",
         "6952f188acdca89d8619919a",
+        "6918b289cc751d7f455cb802",
         "692eeffccd4d5524651ce880",
-        "68f789b046ad5078319c5bbf",
         "696d1e537480b5635b033192",
-        "69703b8eaadefa371703c72a",
+        "68f789b046ad5078319c5bbf",
         "698de9b6f4652a0daac50ffa",
+        "69703b8eaadefa371703c72a",
         "69827a0e7cf831a523f54bd7",
         "6919be1bdb65494c1b26afa1",
         "6991461c6bb70e191fe7a395"
@@ -3009,6 +3033,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 16.03,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
@@ -3020,8 +3052,8 @@
         "69bd149d1348cf457e2c64bb",
         "696b989e1eb1704c85ed0a30",
         "69c48d5e1bbe1908ba627f18",
-        "69767e08d0b91ae6b45500bb",
-        "69c6e35bdf7ae3167f245f9b"
+        "69c6e35bdf7ae3167f245f9b",
+        "69767e08d0b91ae6b45500bb"
       ],
       "last_creep_alert": null,
       "last_creep_delta": null,
@@ -3690,6 +3722,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 41.67,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
@@ -3705,9 +3745,9 @@
         "6996594553a5ede8f66adfe0",
         "69974ca0b0a9df8277170755",
         "698cc1b121c06469eeb6a9e2",
+        "69bc764ea9ceb0160dfb33e8",
         "683a88b98e35000e0108cbe8",
         "69bae5f81348cf457e2ace23",
-        "69bc764ea9ceb0160dfb33e8",
         "69c6d3298a595e2dca9560aa",
         "69e03db35ad8e3fd880c3708",
         "69de13e25bb1f1ef9ff44eb7",
@@ -4119,6 +4159,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 0.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 1,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
@@ -4128,24 +4176,24 @@
         "69b84ea0ac25743c3fc8710b",
         "69b875367ae3343efd514ae4",
         "69ce46095f9cbc0148691e26",
-        "69cfcfce7c951c1d66bced6b",
-        "69b94d08caa5376ae5778a44",
         "69b83f587ae3343efdbcd85d",
+        "69b94d08caa5376ae5778a44",
+        "69cfcfce7c951c1d66bced6b",
         "691bb1a750d80e15bc06952b",
-        "69d4158c6341955760edcd24",
         "69d27ee27862e72e00400d4b",
+        "69d4158c6341955760edcd24",
+        "69d4ee43e83deb4e60e151c0",
+        "69d7c5cdf5419ebd5ba66559",
         "69d43d5c2e2a33a2ae5b912d",
         "69e0d4efb6989dc2116ba37d",
-        "69d7c5cdf5419ebd5ba66559",
-        "69d4ee43e83deb4e60e151c0",
-        "69e1466791c75a72f6af9c6d",
         "69cc2ac5a1cf1b9306930f0b",
+        "69e1466791c75a72f6af9c6d",
         "69e24e743dbda1615a09efe7",
         "69e7cb0e976e825684c57ff4",
-        "69c3c59e68a97bd50e031381",
-        "69dc26daf8d47c04e5390f51",
-        "69e8f9466b219702af3779d4",
         "69dbc46af5419ebd5b3d277f",
+        "69dc26daf8d47c04e5390f51",
+        "69c3c59e68a97bd50e031381",
+        "69e8f9466b219702af3779d4",
         "69d8efc7486f47c70edc21bc"
       ],
       "last_creep_alert": null,
@@ -4160,7 +4208,7 @@
       "last_urgent_alert": null,
       "last_urgent_count": null,
       "name": "Morocco",
-      "new_resets": 0,
+      "new_resets": 1,
       "resetter_combat_ratio": null,
       "sample_size": 25,
       "user_resets": {
@@ -4168,7 +4216,7 @@
         "691b9ee792948e91cb1cffec": "2026-05-19T12:55:48.878Z",
         "691bb1a750d80e15bc06952b": "2026-05-03T04:19:44.445Z",
         "69b83f587ae3343efdbcd85d": "2026-05-07T22:31:02.609Z",
-        "69b84ea0ac25743c3fc8710b": "2026-04-29T11:07:26.771Z",
+        "69b84ea0ac25743c3fc8710b": "2026-06-08T19:35:59.106Z",
         "69b875367ae3343efd514ae4": "2026-05-30T14:25:28.610Z",
         "69b933fe6843e2268ab37d0c": "2026-05-19T07:16:17.386Z",
         "69b94d08caa5376ae5778a44": "2026-05-15T23:56:46.706Z",
@@ -4750,6 +4798,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 13.18,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
@@ -4759,8 +4815,8 @@
         "6946ab6459c0fb7359d50639",
         "696bb9241eb1704c8503ee8e",
         "696bb0bfc9c4e2ee34c17955",
-        "69a54561c41057ad26e27de2",
         "696f0eceaadefa37178272aa",
+        "69a54561c41057ad26e27de2",
         "699b51eb34967ecd15951470",
         "699b9d1540f66da723477abb"
       ],
@@ -5252,6 +5308,14 @@
           "new_resets": 0,
           "resetter_combat_ratio": null,
           "ts": "2026-06-08T16:12:10.127244+00:00"
+        },
+        {
+          "combat_ratio": 0.0,
+          "combat_resets": 0,
+          "eco_resets": 0,
+          "new_resets": 0,
+          "resetter_combat_ratio": null,
+          "ts": "2026-06-08T20:28:45.402471+00:00"
         }
       ],
       "known_veterans": [
@@ -5268,9 +5332,9 @@
         "69896365d754ae752d461fa5",
         "6888f2a98211a3c23be7ec8a",
         "69c3fa526853ceaa7a149222",
-        "698b537def0c6320c861c3f2",
         "69d161d6904e27bdeea39cf7",
         "69cf80375752aefa8b362641",
+        "698b537def0c6320c861c3f2",
         "69e266cd3d07a818108b2733"
       ],
       "last_creep_alert": null,
@@ -5310,6 +5374,6 @@
     "6813b6d446e731854c7ac7b8"
   ],
   "last_posture_date": "2026-06-07",
-  "last_run": "2026-06-08T16:12:10.127244+00:00",
+  "last_run": "2026-06-08T20:28:45.402471+00:00",
   "version": 7
 }
