@@ -1747,17 +1747,17 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name,
         for h in sorted(holding, key=lambda x: -x["current_ratio"])[:15]:
             if h.get("reason") == "active_war":
                 holding_lines.append(
-                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
+                    f"**{h['name']}** · {h['current_ratio']:.0f}% skill-combat "
                     f"(at war with Ireland)"
                 )
             elif h.get("peak_date") and h["peak_date"] != "unknown":
                 holding_lines.append(
-                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
+                    f"**{h['name']}** · {h['current_ratio']:.0f}% skill-combat "
                     f"(peaked {h['peak_ratio']:.0f}% on {h['peak_date']})"
                 )
             else:
                 holding_lines.append(
-                    f"**{h['name']}** · {h['current_ratio']:.0f}% combat focus "
+                    f"**{h['name']}** · {h['current_ratio']:.0f}% skill-combat "
                     f"(still in combat posture)"
                 )
         fields.append({
