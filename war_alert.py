@@ -123,6 +123,13 @@ COMBAT_INTENT = 70.0
 COMBAT_INTENT_MIN_RESETTERS = 2
 ECO_INTENT_MIN_RESETTERS = 2
 
+# A reset cluster in a country that's ALREADY saturated in that direction is
+# routine reinforcement, not fresh mobilisation (e.g. an 88%-combat country
+# where 2 more players rebuild for combat). Those intents are downgraded to the
+# compact "minor activity" roll-up instead of each rendering a full paragraph.
+COMBAT_INTENT_SATURATED = 75.0   # already this combat-built => combat rebuilds are churn
+ECO_INTENT_SATURATED = 25.0      # already this economy-built => eco rebuilds are churn
+
 HIGH_SEVERITY_FACTOR = 1.5
 HIGH_SEVERITY_FLOOR = 20
 
@@ -1343,10 +1350,14 @@ def _digest_line_damage_drop(name, snap, det):
 # ---------- Digest assembly with rollup ----------
 
 def _is_low_severity(flag):
-    # "Minor activity" = a yellow creep only. Single-player intents that used
-    # to land here are now dropped at the detector, so those branches are gone
-    # and the 2+ player intents render as full lines (med severity).
-    return flag["kind"] == "creep" and flag["detection"].get("tier") == "yellow"
+    # "Minor activity" = soft signals listed for awareness, not action: a yellow
+    # creep, or a reset cluster in an already-saturated country (downgraded to
+    # "low" at flag time because it's reinforcement, not fresh mobilisation).
+    if flag["kind"] == "creep":
+        return flag["detection"].get("tier") == "yellow"
+    if flag["kind"] in ("combat_intent", "eco_intent"):
+        return flag["severity"] == "low"
+    return False
 
 
 def _minor_activity_label(flag):
@@ -1354,9 +1365,9 @@ def _minor_activity_label(flag):
     if flag["kind"] == "creep":
         return f"{name} (drifting toward combat)"
     if flag["kind"] == "combat_intent":
-        return f"{name} (combat-leaning)"
+        return f"{name} (combat rebuilds, already war-ready)"
     if flag["kind"] == "eco_intent":
-        return f"{name} (eco-leaning)"
+        return f"{name} (economy rebuilds, already economy-built)"
     return name
 
 
@@ -2034,11 +2045,15 @@ def main():
                     new_country["last_urgent_alert"] = now.isoformat()
                     new_country["last_urgent_count"] = burst["current"]
         elif combat_intent:
+            intent_sev = (
+                "low" if snap["combat_ratio"] >= COMBAT_INTENT_SATURATED
+                else INTENT_SEVERITY
+            )
             flagged.append({
                 "cid": cid,
                 "name": snap["name"],
                 "kind": "combat_intent",
-                "severity": INTENT_SEVERITY,
+                "severity": intent_sev,
                 "snap": snap,
                 "detection": combat_intent,
                 "fresh": True,
@@ -2116,11 +2131,15 @@ def main():
                 })
                 flagged_this_run = True
             elif eco_intent:
+                intent_sev = (
+                    "low" if snap["combat_ratio"] <= ECO_INTENT_SATURATED
+                    else INTENT_SEVERITY
+                )
                 flagged.append({
                     "cid": cid,
                     "name": snap["name"],
                     "kind": "eco_intent",
-                    "severity": INTENT_SEVERITY,
+                    "severity": intent_sev,
                     "snap": snap,
                     "detection": eco_intent,
                     "fresh": True,
