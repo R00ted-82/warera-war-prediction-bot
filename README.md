@@ -6,7 +6,7 @@ Sibling of [`warera-tools-ireland`](https://github.com/to-ie/warera-tools-irelan
 
 ## What you'll see
 
-Every run posts at most one **daily digest** embed listing flagged countries. The digest leads with a short explainer (sample = a country's ~50 most active high-level players, "combat focus" = share of skill points on combat) so first-time readers aren't guessing.
+Every run posts at most one **update** embed listing the countries that escalated or de-escalated this run. Each country is read on two signals shown side by side: its actual war activity (wars declared/ended and weekly combat-damage rank) and its top ~50 active players' skill builds (combat vs economy — a leading indicator that lags real fighting). The embed leads with a short explainer so first-time readers aren't guessing.
 
 Once a day, on the last scheduled run, the bot also posts a **posture overview** embed, a standing picture of the watchlist regardless of whether anything is flagged. See [Posture overview](#posture-overview).
 
@@ -40,6 +40,10 @@ The bot watches several independent signals. A single country can trip multiple 
 
 **Eco-intent rebuilds.** Mirror of combat-intent. Two or more rebuilds into economy (30% or less on combat), or a single one corroborated by a downward weekly shift, flags as demobilising.
 
+**War declared / ended.** Each country's own `warsWith` list is diffed run-to-run. A newly-declared war is a mobilisation signal (high severity, dedicated 🔴 line, when the new war is against Ireland; otherwise amber); a war dropping off the list is a de-escalation signal. The list is only diffed once a prior record exists, so an existing war list is never mistaken for a fresh declaration.
+
+**Weekly damage surge / drop.** Each country reports `weeklyCountryDamages` — a rolling 7-day total of combat damage dealt, with a game-wide rank. The bot compares it to the value 7 days ago: a jump of +60% or more is a surge (high severity for a top-25 damage country), a drop of 50% or more is de-escalation. Gated by an absolute floor so small countries don't trip on noise. **This is the accurate, activity-based signal that skill sampling can't see**: an economy-built country can top the damage tables by fighting through gear and rank, which is exactly why skill focus alone mislabels the real military powers (Netherlands, Germany, Belgium) as "economy-focused". Skill builds are a *leading* indicator; weekly damage is the *concurrent* one, and the two are reported side by side.
+
 ### Flagged, holding, or stood down
 
 When a country that was flagged last run produces no fresh signal this run, the bot doesn't just drop it. It decides between two outcomes:
@@ -53,8 +57,10 @@ Low-severity items (yellow creep, single-rebuild intents that cleared the corrob
 
 Once a day, the 📊 overview shows where the whole watchlist sits on the war-vs-economy spectrum, independent of any alerts:
 
-- **Headline split.** How many countries are war-posture vs economy-posture, a red/green bar, and the average combat focus across the watchlist.
-- **Four tiers.** Heavy combat (70%+), combat-leaning (50-70%), mixed (30-50%), economy-focused (under 30%), each listing its member countries with their combat percentages. Countries Ireland is at war with carry a ⚔️ marker.
+- **Headline split.** Counts of countries at war with Ireland, combat-built, and economy-built, with a one-line note that weekly-damage rank is the real-activity signal and skill-combat % is the leading indicator.
+- **At-war callout.** Countries Ireland is at war with, each with its weekly-damage rank, listed first — war status trumps skill build. At-war countries appear **only** here, never re-listed below.
+- **Most militarily active.** The top countries by weekly-damage rank (the accurate ranking), so a heavyweight reads correctly regardless of how its players are built.
+- **Two skill tiers.** Combat-built (50%+ skill-combat) and economy-built (under 50%), each line tagged with the country's weekly-damage rank for context.
 - **Biggest movers.** The largest 7-day shifts toward war and toward economy. Countries with under a week of history don't appear here.
 - **Holding at high readiness.** Countries that were mobilised, have gone quiet, but are still elevated. This reminder lives here, once a day, rather than in the per-run digest, so it doesn't repeat every 3 hours.
 - **Daily heartbeat.** The report opens with a one-line status, "All quiet today" when nothing fired, or a brief count of the day's signals. Since it always posts at 21:00, it doubles as confirmation the bot ran.
@@ -187,7 +193,7 @@ If the larger 50-player sample plus the higher reset floors make alerts feel too
 
 `war_state.json` lives in the repo and is auto-committed every run. Holds per-country aggregate snapshots with rolling history, cached player IDs for fast next-run sampling, cooldown timestamps for each alert type, the peak combat ratio recorded while a country was flagged (for the stand-down vs holding decision), and the date of the last posture overview. Stays well under 1MB.
 
-The state file is migrated automatically on first run after a schema change. Current version is v6, which added flagged-peak tracking. Migrations are idempotent.
+The state file is migrated automatically on first run after a schema change. Current version is v8, which added per-country military-activity fields (`wars_with`, `weekly_damage`, `weekly_damage_rank`, `total_damage_rank`, `active_pop`). Migrations are idempotent.
 
 Delete `war_state.json` to reset baselines. The first ~5 runs after that will rely on the absolute floor only. Note that when a country re-enters the watchlist after being absent (for example after an occupation ends, or after the watchlist was broken), its first run re-counts every rebuild since it was last sampled as "new," which can briefly look noisy until the next run refreshes its baseline.
 
@@ -205,11 +211,11 @@ Two things confirm the bot is alive. The daily posture report opens with an "all
 
 **State-owned ammo production** isn't detected. Countries that stockpile through their own companies without player retraining will fly under the radar. Would need a separate watcher on `transaction.getPaginatedTransactions`.
 
-**Impulsive wars without a prep window** aren't caught. This bot detects mobilisation, not declarations from peacetime. To catch attacks-in-progress, watch battle creation events directly.
+**Impulsive wars without a prep window** are now caught at declaration time via the `warsWith` diff (a war declared on Ireland is the highest-severity signal the bot raises), but the *fighting* that follows is only visible as a weekly-damage surge, which lags by design. To catch individual attacks-in-progress, watch battle creation events directly.
 
 **Pre-mobilisation diplomacy** isn't observable. By the time the first player pays gold to rebuild, the political decision was made days or weeks earlier. The earliest signal in the game data is the first rebuild wave.
 
-**Tiny countries** with fewer than 10 active level-20+ players still show as "skipped" in logs. They can't mobilise meaningfully, so ignoring them is fine.
+**Tiny countries** with fewer than 10 active level-20+ players can't be skill-sampled and show as "couldn't skill-sample" in the posture report — but their weekly-damage rank is still fetched and shown there, so an unreadable country that's actually fighting hard no longer disappears entirely.
 
 ## Credits
 

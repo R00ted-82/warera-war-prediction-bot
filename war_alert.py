@@ -50,7 +50,7 @@ import requests
 WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 API_BASE = "https://warera-proxy.toie.workers.dev/trpc"
 STATE_FILE = Path("war_state.json")
-STATE_VERSION = 7
+STATE_VERSION = 8
 IRELAND_COUNTRY_ID = "6813b6d446e731854c7ac7fe"
 
 # Ireland's home region IDs. These map territories are fixed; ownership
@@ -102,6 +102,19 @@ RATIO_DROP_1D_MIN = 30.0
 HIGH_DEMOB_FOR_ALERT = 50.0
 DEMOB_RESET_INTENT = 30.0
 
+# ---- Military activity signal (from country.getCountryById rankings) ----
+# Co-equal with skill focus. Skill focus is a *leading* indicator (who is
+# rebuilding for combat before fighting starts); weekly damage is the
+# *concurrent* indicator (who is actually fighting hard right now). The two
+# disagree by design: an economy-built country can top the damage tables by
+# fighting through gear/rank, which is exactly why skill focus alone mislabels
+# the real military powers (e.g. Netherlands/Germany) as "economy-focused".
+WEEKLY_DAMAGE_JUMP_MIN = 0.60   # >= +60% wk-over-wk vs the 7d-ago point = surge
+WEEKLY_DAMAGE_DROP_MIN = 0.50   # <= -50% = damage falling off (de-escalation)
+WEEKLY_DAMAGE_FLOOR = 500_000   # ignore shifts below this absolute weekly damage
+                                # (small countries swing wildly in % terms)
+WEEKLY_DAMAGE_HIGH_RANK = 25    # top-N weekly-damage rank counts as a heavyweight
+
 COMBAT_INTENT = 70.0
 
 # Minimum resetter counts for intent signals. Single-resetter signals are
@@ -124,10 +137,8 @@ DIGEST_REFRESH_FACTOR = 1.5
 STAND_DOWN_RATIO_CEILING = 50.0
 STAND_DOWN_DROP_MIN = 15.0
 
-# Posture overview buckets (current combat focus)
-POSTURE_WAR = 70.0      # heavily combat
-POSTURE_LEAN = 50.0     # combat-leaning
-POSTURE_BALANCED = 30.0 # mixed; below this is economy-focused
+# Posture overview: the census collapses to two skill tiers split at this line.
+POSTURE_LEAN = 50.0     # at/above = combat-built, below = economy-built
 POSTURE_MOVER_MIN = 5.0 # minimum 7d shift to list as a mover
 
 # Pipeline health
@@ -161,8 +172,8 @@ ECO_SKILLS = {
 # per detection, never hardcoded per call site. A 2+ player reset cluster
 # (combat_intent / eco_intent) is "med" in either direction; the two are
 # symmetric.
-MOBILISATION_KINDS = {"burst", "combat_intent", "creep"}
-DEMOB_KINDS = {"collapse", "eco_burst", "eco_intent"}
+MOBILISATION_KINDS = {"burst", "combat_intent", "creep", "war_declared", "damage_surge"}
+DEMOB_KINDS = {"collapse", "eco_burst", "eco_intent", "war_ended", "damage_drop"}
 INTENT_SEVERITY = "med"
 
 
@@ -210,6 +221,66 @@ def fetch_ireland():
         print(f"  warn: could not fetch Ireland country object: {e}",
               file=sys.stderr)
         return None
+
+
+def fetch_country_detail(country_id):
+    """Pull a watchlisted country's own ranking + diplomacy block.
+
+    One cheap call per country (no per-player fan-out). Gives the accurate,
+    activity-based military signal that skill sampling can't: weekly damage
+    dealt, total-damage standing, active population, and the live war /
+    non-aggression-pact state. Returns None on failure so callers can fall
+    back to skill data alone.
+    """
+    try:
+        d = trpc("country.getCountryById", {"countryId": country_id})
+    except Exception as e:
+        print(f"  warn: country detail {country_id}: {e}", file=sys.stderr)
+        return None
+    if not isinstance(d, dict):
+        return None
+    rk = d.get("rankings") or {}
+
+    def _rank_val(key):
+        v = rk.get(key)
+        if not isinstance(v, dict):
+            return None, None
+        return v.get("value"), v.get("rank")
+
+    weekly_damage, weekly_rank = _rank_val("weeklyCountryDamages")
+    _, total_rank = _rank_val("countryDamages")
+    active_pop, _ = _rank_val("countryActivePopulation")
+
+    return {
+        "weekly_damage": weekly_damage,
+        "weekly_damage_rank": weekly_rank,
+        "total_damage_rank": total_rank,
+        "active_pop": active_pop,
+        "wars_with": sorted(
+            c for c in (d.get("warsWith") or []) if isinstance(c, str)
+        ),
+        "naps": {
+            k: v for k, v in (d.get("nonAggressionUntil") or {}).items()
+            if isinstance(v, str)
+        },
+    }
+
+
+def parallel_fetch_details(country_ids):
+    if not country_ids:
+        return {}
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+        futures = {ex.submit(fetch_country_detail, cid): cid for cid in country_ids}
+        out = {}
+        for f in as_completed(futures):
+            cid = futures[f]
+            try:
+                detail = f.result()
+            except Exception:
+                detail = None
+            if detail is not None:
+                out[cid] = detail
+        return out
 
 
 def find_border_countries(regions_obj, country_id, home_region_ids, max_hops=None):
@@ -707,6 +778,50 @@ def detect_ratio_collapse(history, current_ratio, now):
     return winner
 
 
+def detect_war_changes(prev_wars, current_wars):
+    """Diff a country's war list run-to-run.
+
+    Returns (newly_declared, newly_ended) lists of country IDs, or
+    (None, None) when there's no prior record to diff against (first sighting),
+    so a country's whole existing war list can't read as freshly declared.
+    """
+    if prev_wars is None:
+        return None, None
+    prev = set(prev_wars)
+    cur = set(current_wars or [])
+    return sorted(cur - prev), sorted(prev - cur)
+
+
+def detect_damage_shift(history, current_weekly, now):
+    """Week-over-week change in weekly damage dealt, against the 7d-ago point.
+
+    weeklyCountryDamages is a rolling 7-day total, so comparing it to the value
+    7 days ago is a clean week-over-week delta. Gated by an absolute floor so
+    small countries (which swing wildly in percentage terms) don't trip it.
+    """
+    if current_weekly is None:
+        return None
+    pt = _find_history_point(
+        history, now - timedelta(days=RATIO_LOOKBACK_DAYS), now,
+        RATIO_LOOKBACK_DAYS - 1,
+    )
+    if pt is None:
+        return None
+    old = pt.get("weekly_damage")
+    if not old or old <= 0:
+        return None
+    if max(old, current_weekly) < WEEKLY_DAMAGE_FLOOR:
+        return None
+    pct = (current_weekly - old) / old
+    if pct >= WEEKLY_DAMAGE_JUMP_MIN:
+        return {"direction": "surge", "old": old, "current": current_weekly,
+                "pct": round(pct * 100)}
+    if pct <= -WEEKLY_DAMAGE_DROP_MIN:
+        return {"direction": "drop", "old": old, "current": current_weekly,
+                "pct": round(pct * 100)}
+    return None
+
+
 def is_high_severity_burst(burst):
     threshold = burst.get("threshold") or RESET_FLOOR
     return burst["current"] >= max(threshold * HIGH_SEVERITY_FACTOR, HIGH_SEVERITY_FLOOR)
@@ -794,6 +909,18 @@ def migrate(state):
             country.setdefault("last_digest_demob_delta", None)
         state["version"] = 7
         print("Migrated state v6 -> v7 (added per-run update dedup fields).")
+
+    if version < 8:
+        for country in state.get("countries", {}).values():
+            # wars_with stays None until the first detail fetch records it, so
+            # an existing war list isn't mistaken for freshly-declared wars.
+            country.setdefault("wars_with", None)
+            country.setdefault("weekly_damage", None)
+            country.setdefault("weekly_damage_rank", None)
+            country.setdefault("total_damage_rank", None)
+            country.setdefault("active_pop", None)
+        state["version"] = 8
+        print("Migrated state v7 -> v8 (added military-activity fields).")
 
     return state
 
@@ -1161,6 +1288,58 @@ def _digest_line_eco_intent(name, snap, intent):
     return icon, name, main
 
 
+def _digest_line_war_declared(name, snap, det):
+    names = det.get("new_war_names", [])
+    targets = ", ".join(names)
+    if det.get("against_ireland"):
+        icon = "🔴"
+        extra = f" (also opened war on {targets})" if len(names) > 1 else ""
+        main = (
+            f"**Declared war on Ireland.**{extra} This is a live war footing "
+            f"against us, not a skill-build guess."
+        )
+    else:
+        icon = "🟠"
+        war_word = "a new war" if len(names) == 1 else f"{len(names)} new wars"
+        main = (
+            f"Opened {war_word} against {targets}. A bordering country going on "
+            f"the offensive is an active mobilisation signal."
+        )
+    return icon, name, main
+
+
+def _digest_line_war_ended(name, snap, det):
+    names = det.get("ended_war_names", [])
+    targets = ", ".join(names)
+    war_word = "a war" if len(names) == 1 else f"{len(names)} wars"
+    main = (
+        f"Ended {war_word} with {targets}. One fewer active front, an early "
+        f"sign of winding down."
+    )
+    return "🟢", name, main
+
+
+def _digest_line_damage_surge(name, snap, det):
+    rank = det.get("rank")
+    heavyweight = rank is not None and rank <= WEEKLY_DAMAGE_HIGH_RANK
+    icon = "🔴" if heavyweight else "🟠"
+    rank_str = f", now **#{rank}** in the game for weekly damage" if rank else ""
+    main = (
+        f"Weekly combat damage jumped **+{det['pct']}%** vs the previous week"
+        f"{rank_str}. They are fighting markedly harder right now, whatever "
+        f"their skill builds read."
+    )
+    return icon, name, main
+
+
+def _digest_line_damage_drop(name, snap, det):
+    main = (
+        f"Weekly combat damage fell **{abs(det['pct'])}%** vs the previous "
+        f"week. Actual military activity is easing off."
+    )
+    return "🟢", name, main
+
+
 # ---------- Digest assembly with rollup ----------
 
 def _is_low_severity(flag):
@@ -1230,6 +1409,18 @@ def send_digest(flagged, stood_down, now):
             f["name"], f["snap"], f["detection"]
         ),
         "eco_intent": lambda f: _digest_line_eco_intent(
+            f["name"], f["snap"], f["detection"]
+        ),
+        "war_declared": lambda f: _digest_line_war_declared(
+            f["name"], f["snap"], f["detection"]
+        ),
+        "war_ended": lambda f: _digest_line_war_ended(
+            f["name"], f["snap"], f["detection"]
+        ),
+        "damage_surge": lambda f: _digest_line_damage_surge(
+            f["name"], f["snap"], f["detection"]
+        ),
+        "damage_drop": lambda f: _digest_line_damage_drop(
             f["name"], f["snap"], f["detection"]
         ),
     }
@@ -1305,7 +1496,7 @@ def send_digest(flagged, stood_down, now):
     counts_mob = {"high": 0, "med": 0}
     counts_demob = 0
     for f in full_lines:
-        if f["kind"] in ("collapse", "eco_intent", "eco_burst"):
+        if f["kind"] in DEMOB_KINDS:
             counts_demob += 1
         else:
             sev = f["severity"]
@@ -1325,10 +1516,10 @@ def send_digest(flagged, stood_down, now):
     summary = ", ".join(parts) if parts else None
 
     intro = (
-        f"Each line tracks a country's most active high-level players "
-        f"(the top ~{SAMPLE_TOP_N} by level, online recently). \"Combat "
-        f"focus\" is the share of a player's skill points spent on combat "
-        f"skills rather than economy.\n\n"
+        f"Risks and de-escalations since the last check. Signals come from a "
+        f"country's actual war activity (wars declared/ended, weekly combat "
+        f"damage) and from its top ~{SAMPLE_TOP_N} active players' skill builds "
+        f"(combat vs economy — a leading indicator that lags real fighting).\n\n"
     )
 
     total_items = len(full_lines) + len(minor_dedup) + len(stood_down)
@@ -1349,7 +1540,7 @@ def send_digest(flagged, stood_down, now):
 
 
 def _severity_rank(f):
-    if f["kind"] in ("collapse", "eco_intent", "eco_burst"):
+    if f["kind"] in DEMOB_KINDS:
         return (10, f["name"])
     rank = {"high": 0, "med": 1, "low": 2}.get(f["severity"], 9)
     return (rank, f["name"])
@@ -1357,18 +1548,9 @@ def _severity_rank(f):
 
 # ---------- Posture overview ----------
 
-def _posture_bucket(ratio):
-    if ratio >= POSTURE_WAR:
-        return "war"
-    if ratio >= POSTURE_LEAN:
-        return "leaning"
-    if ratio >= POSTURE_BALANCED:
-        return "balanced"
-    return "eco"
-
-
 def send_posture_digest(snapshots, state, active_war_ids, country_name,
-                        watchlist, holding, flagged, stood_down, now):
+                        watchlist, holding, flagged, stood_down, now,
+                        details=None):
     """End-of-day report and daily heartbeat. Sorts every monitored country
     into a war side and an economy side, with a per-tier breakdown, the
     week's biggest movers, the "holding at high readiness" reminder (once a
@@ -1380,24 +1562,26 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name,
     build: a country fighting through gear/rank shows low skill-point combat
     but must not be labelled economy-focused.
     """
+    details = details or {}
     rows = []
     for cid, snap in snapshots.items():
         ratio = snap["combat_ratio"]
         history = state.get("countries", {}).get(cid, {}).get("history", [])
         shift = _ratio_shift_7d(history, ratio, now)
+        det = snap.get("detail") or details.get(cid) or {}
         rows.append({
             "cid": cid,
             "name": snap["name"],
             "ratio": ratio,
-            "bucket": _posture_bucket(ratio),
             "shift_7d": shift,
             "at_war": cid in active_war_ids,
+            "weekly_rank": det.get("weekly_damage_rank"),
         })
 
     monitored = len(watchlist) if watchlist else len(rows)
     sampled = len(rows)
     skipped = sorted(
-        (country_name.get(cid) or cid)
+        ((country_name.get(cid) or cid), (details.get(cid) or {}))
         for cid in (watchlist or {})
         if cid not in snapshots
     )
@@ -1415,29 +1599,31 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name,
         }
         return safe_post(embed, "posture digest")
 
-    buckets = {"war": [], "leaning": [], "balanced": [], "eco": []}
-    for r in rows:
-        buckets[r["bucket"]].append(r)
+    def _dmg_tag(r):
+        rank = r.get("weekly_rank")
+        return f" · #{rank} weekly dmg" if rank else ""
 
-    war_side = len(buckets["war"]) + len(buckets["leaning"])
-    balanced_n = len(buckets["balanced"])
-    eco_side = len(buckets["eco"])
+    def _country_line(r):
+        return f"**{r['name']}** · {r['ratio']:.0f}% skill-combat{_dmg_tag(r)}"
 
-    # Three-colour split bar: red (war) / yellow (mixed) / green (economy).
-    bar_len = 20
-    if sampled:
-        war_blocks = round((war_side / sampled) * bar_len)
-        bal_blocks = round((balanced_n / sampled) * bar_len)
-    else:
-        war_blocks = bal_blocks = 0
-    eco_blocks = max(bar_len - war_blocks - bal_blocks, 0)
-    split_bar = "🟥" * war_blocks + "🟨" * bal_blocks + "🟩" * eco_blocks
-
-    avg_ratio = statistics.mean(r["ratio"] for r in rows)
+    # At-war countries appear ONLY in their own callout below; everywhere else
+    # they're excluded, so nothing is listed twice (the old double-listing bug).
+    at_war_rows = sorted(
+        (r for r in rows if r["at_war"]),
+        key=lambda r: (r["weekly_rank"] or 9999),
+    )
+    combat_built = sorted(
+        (r for r in rows if not r["at_war"] and r["ratio"] >= POSTURE_LEAN),
+        key=lambda r: -r["ratio"],
+    )
+    eco_built = sorted(
+        (r for r in rows if not r["at_war"] and r["ratio"] < POSTURE_LEAN),
+        key=lambda r: -r["ratio"],
+    )
 
     # Heartbeat / activity status line
-    mob = sum(1 for f in flagged if f["kind"] in ("burst", "combat_intent", "creep"))
-    demob = sum(1 for f in flagged if f["kind"] in ("collapse", "eco_intent", "eco_burst"))
+    mob = sum(1 for f in flagged if f["kind"] in MOBILISATION_KINDS)
+    demob = sum(1 for f in flagged if f["kind"] in DEMOB_KINDS)
     bits = []
     if mob:
         bits.append(f"**{mob}** mobilising")
@@ -1456,70 +1642,79 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name,
         f"**{sampled} countries**"
         if sampled == monitored
         else f"**{sampled} of {monitored} monitored countries** (rest had too "
-             f"few active players to read)"
+             f"few active players to skill-sample)"
     )
     description = (
         status_line
-        + f"How {scope} are split right now, by what their top players are "
-        f"built for. \"Combat focus\" is the share of skill points a typical "
-        f"top player spends on combat skills rather than economy.\n\n"
-        f"⚔️ **War footing: {war_side}**   🟨 **Mixed: {balanced_n}**   "
-        f"🌾 **Economy footing: {eco_side}**\n"
-        f"{split_bar}\n"
-        f"Average combat focus: **{avg_ratio:.0f}%**\n"
-        f"_⚔️ next to a country means Ireland is currently at war with it._"
+        + f"Posture of {scope} on two signals. **Weekly damage rank** is actual "
+        f"fighting right now (lower # = more damage dealt, game-wide). "
+        f"**Skill-combat %** is how the top players are *built* — a leading "
+        f"indicator that lags real fighting, so economy-built countries can "
+        f"still top the damage tables.\n\n"
+        f"⚔️ **At war with Ireland: {len(at_war_rows)}**   "
+        f"🪖 **Combat-built: {len(combat_built)}**   "
+        f"🌾 **Economy-built: {len(eco_built)}**"
     )
-
-    def _country_line(r):
-        tag = "   ⚔️" if r["at_war"] else ""
-        return f"**{r['name']}** · {r['ratio']:.0f}% combat focus{tag}"
 
     fields = []
 
-    # At-war callout FIRST, regardless of skill build. An at-war country with
-    # low skill-point combat is fighting through gear/rank, not standing down.
-    at_war_rows = sorted(
-        (r for r in rows if r["at_war"]),
-        key=lambda r: -r["ratio"],
-    )
+    # At-war callout FIRST — war status trumps skill build.
     if at_war_rows:
-        lines = []
-        for r in at_war_rows:
-            if r["ratio"] < POSTURE_BALANCED:
-                note = " (low skill-point combat; fighting through gear/rank)"
-            else:
-                note = ""
-            lines.append(f"**{r['name']}** · {r['ratio']:.0f}% combat focus{note}")
+        lines = [
+            f"**{r['name']}** · {r['ratio']:.0f}% skill-combat{_dmg_tag(r)}"
+            for r in at_war_rows
+        ]
         fields.append({
             "name": f"⚔️ Currently at war with Ireland   ({len(at_war_rows)})",
             "value": (
-                "_These countries are at war now. Skill-point combat focus is "
-                "shown for context, but war status is what matters here._\n"
+                "_At war now. Damage rank shows how hard they're actually "
+                "fighting; skill-combat % is just their build._\n"
                 + "\n".join(lines)
             ),
             "inline": False,
         })
 
+    # Most militarily active — the accurate ranking, regardless of skill build.
+    most_active = sorted(
+        (r for r in rows if not r["at_war"] and r.get("weekly_rank")),
+        key=lambda r: r["weekly_rank"],
+    )[:8]
+    if most_active:
+        lines = [
+            f"**{r['name']}** · #{r['weekly_rank']} weekly dmg · "
+            f"{r['ratio']:.0f}% skill-combat"
+            for r in most_active
+        ]
+        fields.append({
+            "name": "🪖 Most militarily active (by weekly damage)",
+            "value": (
+                "_Highest actual combat output among countries not already "
+                "at war with us._\n" + "\n".join(lines)
+            ),
+            "inline": False,
+        })
+
+    # Skill-build split, collapsed to two tiers, at-war excluded.
     tier_meta = [
-        ("war", "🔴 Heavy combat · 70% and up (war-ready)"),
-        ("leaning", "🟠 Combat-leaning · 50 to 70%"),
-        ("balanced", "🟡 Mixed · 30 to 50%"),
-        ("eco", "🟢 Economy-focused · under 30%"),
+        ("🔴 Combat-built · 50%+ skill-combat", combat_built),
+        ("🌾 Economy-built · under 50% skill-combat", eco_built),
     ]
-    for key, label in tier_meta:
-        members = sorted(buckets[key], key=lambda r: -r["ratio"])
+    for label, members in tier_meta:
         if not members:
             continue
-        lines = "\n".join(_country_line(r) for r in members[:20])
-        if len(members) > 20:
-            lines += f"\n_…and {len(members) - 20} more_"
+        lines = "\n".join(_country_line(r) for r in members[:15])
+        if len(members) > 15:
+            lines += f"\n_…and {len(members) - 15} more_"
         fields.append({
             "name": f"{label}   ({len(members)})",
             "value": lines,
             "inline": False,
         })
 
-    with_shift = [r for r in rows if r["shift_7d"] is not None]
+    # Skill-build movers. At-war countries are excluded: their build drift is
+    # noise next to the fact they're fighting, and a stale 7d comparison point
+    # otherwise reads them as "winding down" while they top the damage tables.
+    with_shift = [r for r in rows if r["shift_7d"] is not None and not r["at_war"]]
     risers = sorted(
         (r for r in with_shift if r["shift_7d"] >= POSTURE_MOVER_MIN),
         key=lambda r: -r["shift_7d"],
@@ -1531,17 +1726,18 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name,
 
     def _mover_line(r):
         was = r["ratio"] - r["shift_7d"]
-        return f"**{r['name']}** · {was:.0f}% to {r['ratio']:.0f}% combat focus this week"
+        return (f"**{r['name']}** · {was:.0f}% to {r['ratio']:.0f}% "
+                f"skill-combat this week{_dmg_tag(r)}")
 
     if risers:
         fields.append({
-            "name": "📈 Building up (shifted toward war this week)",
+            "name": "📈 Building up (skill builds shifting toward combat)",
             "value": "\n".join(_mover_line(r) for r in risers),
             "inline": False,
         })
     if fallers:
         fields.append({
-            "name": "📉 Winding down (shifted toward economy this week)",
+            "name": "📉 Winding down (skill builds shifting toward economy)",
             "value": "\n".join(_mover_line(r) for r in fallers),
             "inline": False,
         })
@@ -1575,10 +1771,14 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name,
         })
 
     if skipped:
-        shown = ", ".join(skipped[:15])
+        def _skip_label(item):
+            nm, det = item
+            rank = det.get("weekly_damage_rank")
+            return f"{nm} (#{rank} weekly dmg)" if rank else nm
+        shown = ", ".join(_skip_label(s) for s in skipped[:15])
         more = f" (+{len(skipped) - 15} more)" if len(skipped) > 15 else ""
         fields.append({
-            "name": f"⚪ Couldn't read · too few active players   ({len(skipped)})",
+            "name": f"⚪ Couldn't skill-sample · too few active players   ({len(skipped)})",
             "value": shown + more,
             "inline": False,
         })
@@ -1690,6 +1890,12 @@ def main():
 
     countries = [c for c in countries if c.get("_id") in watchlist]
 
+    # Military-activity signal: one cheap getCountryById per watchlisted country
+    # (no per-player fan-out). Fetched for every watchlist member, even those we
+    # can't skill-sample, so an unreadable at-war heavyweight still surfaces.
+    details = parallel_fetch_details(list(watchlist.keys()))
+    print(f"Fetched country detail for {len(details)}/{len(watchlist)} countries.")
+
     snapshots = {}
     for i, country in enumerate(countries, 1):
         cid = country.get("_id")
@@ -1706,6 +1912,7 @@ def main():
         if snap is None:
             print("skipped (insufficient sample)")
             continue
+        snap["detail"] = details.get(cid)
         snapshots[cid] = snap
         mode = "disc" if snap.get("used_discovery") else "cache"
         rcr = snap.get("resetter_combat_ratio")
@@ -1715,9 +1922,13 @@ def main():
             intent_str = f" cmb={snap['combat_resets']}"
         elif snap.get("eco_resets"):
             intent_str = f" eco={snap['eco_resets']}"
+        det = snap.get("detail") or {}
+        dmg_str = ""
+        if det.get("weekly_damage_rank"):
+            dmg_str = f" wklyDmgRank=#{det['weekly_damage_rank']}"
         print(f"sample={snap['sample_size']}({mode}) "
               f"new_resets={snap['new_resets']}{intent_str} "
-              f"combat={snap['combat_ratio']:.0f}%{rcr_str}")
+              f"combat={snap['combat_ratio']:.0f}%{rcr_str}{dmg_str}")
 
     if watchlist:
         snapshot_rate = len(snapshots) / len(watchlist)
@@ -1737,12 +1948,26 @@ def main():
         prev_country = state.get("countries", {}).get(cid, {})
         history = prev_country.get("history", [])
 
+        detail = snap.get("detail") or {}
+        weekly_damage = detail.get("weekly_damage")
+        current_wars = detail.get("wars_with")
+
         burst = detect_reset_burst(history, snap["new_resets"])
         burst_dir = _burst_direction(snap) if burst else None
         creep = detect_ratio_creep(history, snap["combat_ratio"], now)
         collapse = detect_ratio_collapse(history, snap["combat_ratio"], now)
         combat_intent = detect_combat_intent_resets(snap, history, now)
         eco_intent = detect_eco_intent_resets(snap, history, now)
+
+        # Military-activity detectors. wars_with is only diffed when we have a
+        # prior record (prev_wars is None on first sighting), so an existing
+        # war list never reads as freshly declared. Damage shift needs the
+        # detail block; absent it, both come back empty.
+        prev_wars = prev_country.get("wars_with")
+        new_wars, ended_wars = (None, None)
+        if current_wars is not None:
+            new_wars, ended_wars = detect_war_changes(prev_wars, current_wars)
+        damage_shift = detect_damage_shift(history, weekly_damage, now)
 
         new_history = (history + [{
             "ts": now.isoformat(),
@@ -1751,6 +1976,7 @@ def main():
             "eco_resets": snap.get("eco_resets", 0),
             "combat_ratio": snap["combat_ratio"],
             "resetter_combat_ratio": snap.get("resetter_combat_ratio"),
+            "weekly_damage": weekly_damage,
         }])[-HISTORY_LEN:]
 
         new_country = {
@@ -1774,6 +2000,11 @@ def main():
             "last_flagged_peak_ratio": prev_country.get("last_flagged_peak_ratio"),
             "last_digest_creep_delta": prev_country.get("last_digest_creep_delta"),
             "last_digest_demob_delta": prev_country.get("last_digest_demob_delta"),
+            "wars_with": current_wars if current_wars is not None else prev_wars,
+            "weekly_damage": weekly_damage,
+            "weekly_damage_rank": detail.get("weekly_damage_rank"),
+            "total_damage_rank": detail.get("total_damage_rank"),
+            "active_pop": detail.get("active_pop"),
             "history": new_history,
         }
 
@@ -1902,6 +2133,66 @@ def main():
             # Active war: collapse suppressed, so clear stored demob delta.
             new_country["last_digest_demob_delta"] = None
 
+        # ---- Military-activity flagging (independent of skill signals) ----
+        # War-list and weekly-damage changes are the accurate, activity-based
+        # signal that skill focus can't see. A war *declared* against Ireland is
+        # the single most urgent thing this bot can report.
+        if new_wars:
+            against_ireland = IRELAND_COUNTRY_ID in new_wars
+            flagged.append({
+                "cid": cid,
+                "name": snap["name"],
+                "kind": "war_declared",
+                "severity": "high" if against_ireland else "med",
+                "snap": snap,
+                "detection": {
+                    "new_wars": new_wars,
+                    "new_war_names": [country_name.get(c, c) for c in new_wars],
+                    "against_ireland": against_ireland,
+                },
+                "fresh": True,
+            })
+            flagged_this_run = True
+        if ended_wars:
+            flagged.append({
+                "cid": cid,
+                "name": snap["name"],
+                "kind": "war_ended",
+                "severity": "med",
+                "snap": snap,
+                "detection": {
+                    "ended_wars": ended_wars,
+                    "ended_war_names": [country_name.get(c, c) for c in ended_wars],
+                },
+                "fresh": True,
+            })
+            flagged_this_run = True
+
+        if damage_shift and damage_shift["direction"] == "surge":
+            rank = detail.get("weekly_damage_rank")
+            heavyweight = rank is not None and rank <= WEEKLY_DAMAGE_HIGH_RANK
+            flagged.append({
+                "cid": cid,
+                "name": snap["name"],
+                "kind": "damage_surge",
+                "severity": "high" if heavyweight else "med",
+                "snap": snap,
+                "detection": {**damage_shift, "rank": rank},
+                "fresh": True,
+            })
+            flagged_this_run = True
+        elif damage_shift and damage_shift["direction"] == "drop":
+            flagged.append({
+                "cid": cid,
+                "name": snap["name"],
+                "kind": "damage_drop",
+                "severity": "med",
+                "snap": snap,
+                "detection": {**damage_shift, "rank": detail.get("weekly_damage_rank")},
+                "fresh": True,
+            })
+            flagged_this_run = True
+
         # ---- Track peak ratio while flagged for the stand-down detector ----
         if flagged_this_run:
             if new_country["last_flagged_at"] is None:
@@ -1974,7 +2265,8 @@ def main():
     today = now.strftime("%Y-%m-%d")
     if now.hour >= 21 and state.get("last_posture_date") != today:
         if send_posture_digest(snapshots, state, active_war_ids, country_name,
-                               watchlist, holding, flagged, stood_down, now):
+                               watchlist, holding, flagged, stood_down, now,
+                               details=details):
             state["last_posture_date"] = today
 
     # Per-run update posts only on fresh flags or stand-downs, never on
@@ -1989,10 +2281,10 @@ def main():
     save_state(state)
 
     mob_count = sum(
-        1 for f in flagged if f["kind"] in ("burst", "combat_intent", "creep")
+        1 for f in flagged if f["kind"] in MOBILISATION_KINDS
     )
     demob_count = sum(
-        1 for f in flagged if f["kind"] in ("collapse", "eco_intent", "eco_burst")
+        1 for f in flagged if f["kind"] in DEMOB_KINDS
     )
     print(
         f"Done. Snapshots: {len(snapshots)}. "
