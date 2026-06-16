@@ -144,9 +144,11 @@ DIGEST_REFRESH_FACTOR = 1.5
 STAND_DOWN_RATIO_CEILING = 50.0
 STAND_DOWN_DROP_MIN = 15.0
 
-# Posture overview: the census collapses to two skill tiers split at this line.
-POSTURE_LEAN = 50.0     # at/above = combat-built, below = economy-built
-POSTURE_MOVER_MIN = 5.0 # minimum 7d shift to list as a mover
+# Posture overview: plain-word build tiers for the daily roster.
+POSTURE_WAR = 70.0      # >= "combat" build
+POSTURE_LEAN = 50.0     # >= "combat-leaning"
+POSTURE_MIXED = 30.0    # >= "mixed"; below this is an "economy" build
+POSTURE_MOVER_MIN = 5.0 # minimum 7d build shift to tag a country as a mover
 
 # Pipeline health
 HEALTH_SNAPSHOT_RATE = 0.5
@@ -1559,19 +1561,32 @@ def _severity_rank(f):
 
 # ---------- Posture overview ----------
 
+def _build_word(ratio):
+    """Plain-word label for a country's skill build, so a fighting-but-economy
+    country reads as "economy build · #11 dmg" instead of a jarring "0%"."""
+    if ratio >= POSTURE_WAR:
+        return "combat"
+    if ratio >= POSTURE_LEAN:
+        return "combat-leaning"
+    if ratio >= POSTURE_MIXED:
+        return "mixed"
+    return "economy"
+
+
 def send_posture_digest(snapshots, state, active_war_ids, country_name,
                         watchlist, holding, flagged, stood_down, now,
                         details=None):
     """End-of-day report and daily heartbeat. Sorts every monitored country
     into a war side and an economy side, with a per-tier breakdown, the
-    week's biggest movers, the "holding at high readiness" reminder (once a
-    day, here, not in the per-run update), and any country that couldn't be
-    read. Carries an "all quiet" status line when nothing fired, so a
-    healthy run is visible once a day even on a calm day.
+    day, here, not in the per-run update).
 
-    At-war countries get a dedicated callout at the top regardless of skill
-    build: a country fighting through gear/rank shows low skill-point combat
-    but must not be labelled economy-focused.
+    One unified roster, each country listed exactly once: at-war countries in
+    their own callout first, then everyone else in a single list sorted by
+    recent combat output (weekly-damage rank). Build is shown as a plain word,
+    and movers (📈/📉) and holding are inline tags rather than separate
+    sections, so the same country never appears two or three times. Carries an
+    "all quiet" status line when nothing fired, so a healthy run is visible
+    once a day even on a calm day.
     """
     details = details or {}
     rows = []
@@ -1610,26 +1625,29 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name,
         }
         return safe_post(embed, "posture digest")
 
-    def _dmg_tag(r):
-        rank = r.get("weekly_rank")
-        return f" · #{rank} weekly dmg" if rank else ""
+    holding_by_cid = {h["cid"]: h for h in (holding or []) if h.get("cid")}
 
-    def _country_line(r):
-        return f"**{r['name']}** · {r['ratio']:.0f}% skill-combat{_dmg_tag(r)}"
+    def _roster_line(r, at_war=False):
+        rank = f"#{r['weekly_rank']} dmg" if r.get("weekly_rank") else "dmg rank n/a"
+        parts = [f"**{r['name']}**", rank, f"{_build_word(r['ratio'])} build"]
+        sh = r.get("shift_7d")
+        if not at_war and sh is not None and abs(sh) >= POSTURE_MOVER_MIN:
+            was = r["ratio"] - sh
+            arrow = "📈" if sh > 0 else "📉"
+            parts.append(f"{arrow} {was:.0f}→{r['ratio']:.0f}%")
+        if not at_war and r["cid"] in holding_by_cid:
+            parts.append("holding")
+        return " · ".join(parts)
 
-    # At-war countries appear ONLY in their own callout below; everywhere else
-    # they're excluded, so nothing is listed twice (the old double-listing bug).
+    # At-war countries appear ONLY in their callout; everyone else appears once
+    # in the roster below, sorted by recent combat output.
     at_war_rows = sorted(
         (r for r in rows if r["at_war"]),
         key=lambda r: (r["weekly_rank"] or 9999),
     )
-    combat_built = sorted(
-        (r for r in rows if not r["at_war"] and r["ratio"] >= POSTURE_LEAN),
-        key=lambda r: -r["ratio"],
-    )
-    eco_built = sorted(
-        (r for r in rows if not r["at_war"] and r["ratio"] < POSTURE_LEAN),
-        key=lambda r: -r["ratio"],
+    others = sorted(
+        (r for r in rows if not r["at_war"]),
+        key=lambda r: (r["weekly_rank"] is None, r["weekly_rank"] or 0, -r["ratio"]),
     )
 
     # Heartbeat / activity status line
@@ -1645,139 +1663,39 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name,
     if holding:
         bits.append(f"**{len(holding)}** holding")
     if bits:
-        status_line = "Today's signals: " + ", ".join(bits) + ".\n\n"
+        status_line = "Today: " + ", ".join(bits) + ".\n\n"
     else:
-        status_line = "✅ All quiet today: no mobilisation or stand-down signals.\n\n"
+        status_line = "✅ All quiet today — no mobilisation or stand-down signals.\n\n"
 
     scope = (
-        f"**{sampled} countries**"
+        f"all **{monitored}** monitored countries"
         if sampled == monitored
-        else f"**{sampled} of {monitored} monitored countries** (rest had too "
-             f"few active players to skill-sample)"
+        else f"**{sampled} of {monitored}** monitored countries"
     )
     description = (
         status_line
-        + f"Posture of {scope} on two signals. **Weekly damage rank** is actual "
-        f"fighting right now (lower # = more damage dealt, game-wide). "
-        f"**Skill-combat %** is how the top players are *built* — a leading "
-        f"indicator that lags real fighting, so economy-built countries can "
-        f"still top the damage tables.\n\n"
-        f"⚔️ **At war with Ireland: {len(at_war_rows)}**   "
-        f"🪖 **Combat-built: {len(combat_built)}**   "
-        f"🌾 **Economy-built: {len(eco_built)}**"
+        + f"Read {scope}, sorted by recent combat output. _Damage rank = how hard "
+        f"they're actually fighting; build = how the top players are skilled, a "
+        f"leading hint that lags real fighting._"
     )
 
     fields = []
 
-    # At-war callout FIRST — war status trumps skill build.
     if at_war_rows:
-        lines = [
-            f"**{r['name']}** · {r['ratio']:.0f}% skill-combat{_dmg_tag(r)}"
-            for r in at_war_rows
-        ]
         fields.append({
-            "name": f"⚔️ Currently at war with Ireland   ({len(at_war_rows)})",
-            "value": (
-                "_At war now. Damage rank shows how hard they're actually "
-                "fighting; skill-combat % is just their build._\n"
-                + "\n".join(lines)
-            ),
+            "name": f"⚔️ At war with Ireland   ({len(at_war_rows)})",
+            "value": "\n".join(_roster_line(r, at_war=True) for r in at_war_rows),
             "inline": False,
         })
 
-    # Most militarily active — the accurate ranking, regardless of skill build.
-    most_active = sorted(
-        (r for r in rows if not r["at_war"] and r.get("weekly_rank")),
-        key=lambda r: r["weekly_rank"],
-    )[:8]
-    if most_active:
-        lines = [
-            f"**{r['name']}** · #{r['weekly_rank']} weekly dmg · "
-            f"{r['ratio']:.0f}% skill-combat"
-            for r in most_active
-        ]
+    if others:
+        shown = others[:25]
+        lines = "\n".join(_roster_line(r) for r in shown)
+        if len(others) > 25:
+            lines += f"\n_…and {len(others) - 25} more_"
         fields.append({
-            "name": "🪖 Most militarily active (by weekly damage)",
-            "value": (
-                "_Highest actual combat output among countries not already "
-                "at war with us._\n" + "\n".join(lines)
-            ),
-            "inline": False,
-        })
-
-    # Skill-build split, collapsed to two tiers, at-war excluded.
-    tier_meta = [
-        ("🔴 Combat-built · 50%+ skill-combat", combat_built),
-        ("🌾 Economy-built · under 50% skill-combat", eco_built),
-    ]
-    for label, members in tier_meta:
-        if not members:
-            continue
-        lines = "\n".join(_country_line(r) for r in members[:15])
-        if len(members) > 15:
-            lines += f"\n_…and {len(members) - 15} more_"
-        fields.append({
-            "name": f"{label}   ({len(members)})",
+            "name": f"📊 Watchlist by combat output   ({len(others)})",
             "value": lines,
-            "inline": False,
-        })
-
-    # Skill-build movers. At-war countries are excluded: their build drift is
-    # noise next to the fact they're fighting, and a stale 7d comparison point
-    # otherwise reads them as "winding down" while they top the damage tables.
-    with_shift = [r for r in rows if r["shift_7d"] is not None and not r["at_war"]]
-    risers = sorted(
-        (r for r in with_shift if r["shift_7d"] >= POSTURE_MOVER_MIN),
-        key=lambda r: -r["shift_7d"],
-    )[:5]
-    fallers = sorted(
-        (r for r in with_shift if r["shift_7d"] <= -POSTURE_MOVER_MIN),
-        key=lambda r: r["shift_7d"],
-    )[:5]
-
-    def _mover_line(r):
-        was = r["ratio"] - r["shift_7d"]
-        return (f"**{r['name']}** · {was:.0f}% to {r['ratio']:.0f}% "
-                f"skill-combat this week{_dmg_tag(r)}")
-
-    if risers:
-        fields.append({
-            "name": "📈 Building up (skill builds shifting toward combat)",
-            "value": "\n".join(_mover_line(r) for r in risers),
-            "inline": False,
-        })
-    if fallers:
-        fields.append({
-            "name": "📉 Winding down (skill builds shifting toward economy)",
-            "value": "\n".join(_mover_line(r) for r in fallers),
-            "inline": False,
-        })
-
-    if holding:
-        holding_lines = []
-        for h in sorted(holding, key=lambda x: -x["current_ratio"])[:15]:
-            if h.get("reason") == "active_war":
-                holding_lines.append(
-                    f"**{h['name']}** · {h['current_ratio']:.0f}% skill-combat "
-                    f"(at war with Ireland)"
-                )
-            elif h.get("peak_date") and h["peak_date"] != "unknown":
-                holding_lines.append(
-                    f"**{h['name']}** · {h['current_ratio']:.0f}% skill-combat "
-                    f"(peaked {h['peak_ratio']:.0f}% on {h['peak_date']})"
-                )
-            else:
-                holding_lines.append(
-                    f"**{h['name']}** · {h['current_ratio']:.0f}% skill-combat "
-                    f"(still in combat posture)"
-                )
-        fields.append({
-            "name": "🟠 Holding at high readiness",
-            "value": (
-                "_Previously mobilised, no fresh activity, but still elevated. "
-                "A daily reminder, not a new warning._\n"
-                + "\n".join(holding_lines)
-            ),
             "inline": False,
         })
 
@@ -1785,11 +1703,11 @@ def send_posture_digest(snapshots, state, active_war_ids, country_name,
         def _skip_label(item):
             nm, det = item
             rank = det.get("weekly_damage_rank")
-            return f"{nm} (#{rank} weekly dmg)" if rank else nm
+            return f"{nm} (#{rank} dmg)" if rank else nm
         shown = ", ".join(_skip_label(s) for s in skipped[:15])
         more = f" (+{len(skipped) - 15} more)" if len(skipped) > 15 else ""
         fields.append({
-            "name": f"⚪ Couldn't skill-sample · too few active players   ({len(skipped)})",
+            "name": f"⚪ Couldn't read · too few active players   ({len(skipped)})",
             "value": shown + more,
             "inline": False,
         })

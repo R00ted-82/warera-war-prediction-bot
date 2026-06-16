@@ -55,14 +55,11 @@ Low-severity items (yellow creep, single-rebuild intents that cleared the corrob
 
 ## Posture overview
 
-Once a day, the 📊 overview shows where the whole watchlist sits on the war-vs-economy spectrum, independent of any alerts:
+Once a day, the 📊 overview shows the whole watchlist as **one unified roster, each country listed exactly once** — no country appears in two or three overlapping sections any more:
 
-- **Headline split.** Counts of countries at war with Ireland, combat-built, and economy-built, with a one-line note that weekly-damage rank is the real-activity signal and skill-combat % is the leading indicator.
-- **At-war callout.** Countries Ireland is at war with, each with its weekly-damage rank, listed first — war status trumps skill build. At-war countries appear **only** here, never re-listed below.
-- **Most militarily active.** The top countries by weekly-damage rank (the accurate ranking), so a heavyweight reads correctly regardless of how its players are built.
-- **Two skill tiers.** Combat-built (50%+ skill-combat) and economy-built (under 50%), each line tagged with the country's weekly-damage rank for context.
-- **Biggest movers.** The largest 7-day shifts toward war and toward economy. Countries with under a week of history don't appear here.
-- **Holding at high readiness.** Countries that were mobilised, have gone quiet, but are still elevated. This reminder lives here, once a day, rather than in the per-run digest, so it doesn't repeat every 3 hours.
+- **At-war callout.** Countries Ireland is at war with, each with its weekly-damage rank, listed first — war status trumps skill build.
+- **Watchlist by combat output.** Everyone else, in a single list sorted by weekly-damage rank (real fighting, most-active first). Each line shows the country's build as a plain word (`combat` / `combat-leaning` / `mixed` / `economy`), so a fighting-but-economy country reads naturally as "economy build · #11 dmg" instead of a jarring "0%". Movers carry an inline 📈/📉 with the week's shift, and a country holding at high readiness carries an inline `holding` tag — so movers and holding are no longer separate sections.
+- **Couldn't read.** Countries with too few active players to skill-sample, still shown with their weekly-damage rank so a fighting heavyweight isn't dropped.
 - **Daily heartbeat.** The report opens with a one-line status, "All quiet today" when nothing fired, or a brief count of the day's signals. Since it always posts at 21:00, it doubles as confirmation the bot ran.
 
 It's gated to one post per day on the first run at or after 21:00 UTC, tracked by date so a manual trigger can't double-post.
