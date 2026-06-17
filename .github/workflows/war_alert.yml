@@ -2,7 +2,8 @@ name: War preparation alert
 
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '0 */3 * * *'   # every 3 hours (event monitoring)
+    - cron: '0 20 * * *'    # 20:00 UTC (8pm) — daily posture report fires here
   workflow_dispatch:
 
 # Prevents two runs from racing on war_state.json if a scheduled run
