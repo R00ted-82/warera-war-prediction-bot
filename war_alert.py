@@ -44,13 +44,21 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 
 WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 API_BASE = "https://warera-proxy.toie.workers.dev/trpc"
 STATE_FILE = Path("war_state.json")
-STATE_VERSION = 9
+STATE_VERSION = 11
+
+# The daily posture report fires at 8pm Ireland local time year-round. GitHub
+# Actions cron is UTC-only and DST-blind, so the workflow runs at both 19:00 and
+# 20:00 UTC and we gate on the actual Dublin local hour: 8pm = 19:00 UTC in
+# summer (IST), 20:00 UTC in winter (GMT). The date guard keeps it to one post.
+IRELAND_TZ = ZoneInfo("Europe/Dublin")
+POSTURE_LOCAL_HOUR = 20
 IRELAND_COUNTRY_ID = "6813b6d446e731854c7ac7fe"
 
 # Ireland's home region IDs. These map territories are fixed; ownership
@@ -102,18 +110,27 @@ RATIO_DROP_1D_MIN = 30.0
 DEMOB_RESET_INTENT = 30.0
 
 # ---- Military activity signal (from country.getCountryById rankings) ----
-# Weekly damage dealt (a rolling 7-day total) is the accurate, activity-based
-# signal that skill focus can't see: an economy-built country can top the
-# damage tables by fighting through gear/rank. We model each country as being
-# in one of two phases — "attacking" or "quiet" — with hysteresis between two
-# thresholds so it doesn't flap, and report the transitions:
+# The accurate, activity-based signal skill focus can't see: an economy-built
+# country can top the damage tables by fighting through gear/rank.
+#
+# NOTE on the metric: `weeklyCountryDamages` is a weekly ACCUMULATOR — it grows
+# from ~0 at the weekly reset to hundreds of millions, then resets. Its raw
+# value mostly tells you how far into the week it is, not whether a country is
+# fighting *now*. So for "is it fighting right now" we use the RATE of damage:
+# the increase in cumulative all-time damage (`countryDamages`, which never
+# resets) over a ~24h smoothing window, expressed as damage/day. Each country is
+# modelled as "attacking" or "quiet" with hysteresis between two rate
+# thresholds, and we report the transitions:
 #   quiet -> attacking          = "started attacking"
 #   attacking, N+ days running  = "sustained offensive"
 #   attacking -> quiet          = "went quiet"
-DAMAGE_ACTIVE = 3_000_000    # weekly damage at/above this = "attacking"
-DAMAGE_QUIET = 1_000_000     # weekly damage below this = "quiet" (hysteresis gap)
-SUSTAINED_DAYS = 4           # days attacking before a "sustained offensive" flag
-WEEKLY_DAMAGE_HIGH_RANK = 25 # top-N weekly-damage rank counts as a heavyweight
+# Calibrated from live data (Jun 2026): heavy fighters run 20-340 M/day, quiet
+# countries under ~8 M/day. Revisit if the game's damage numbers scale up.
+DAMAGE_ACTIVE_RATE = 20_000_000   # >= this many damage/day = "attacking"
+DAMAGE_QUIET_RATE = 8_000_000     # <= this many damage/day = "quiet" (hysteresis gap)
+RATE_WINDOW_HOURS = 24            # smoothing window for the damage rate
+SUSTAINED_DAYS = 4                # days attacking before a "sustained offensive" flag
+WEEKLY_DAMAGE_HIGH_RANK = 25      # top-N weekly-damage rank counts as a heavyweight
 
 COMBAT_INTENT = 70.0
 
@@ -167,11 +184,27 @@ ECO_SKILLS = {
 # Severity (high/med/low) is derived per detection, never hardcoded per call
 # site, and drives the line icon (🔴 / 🟠 / 🟢).
 MOBILISATION_KINDS = {
-    "war_declared", "started_attacking", "sustained_offensive",
+    "war_declared", "at_war", "started_attacking", "sustained_offensive",
     "arming_up", "rebuild_war",
 }
 DEMOB_KINDS = {"war_ended", "went_quiet", "easing_off", "rebuild_eco"}
 INTENT_SEVERITY = "med"
+
+# When a country trips several signals in one run, the per-run update shows its
+# single most important line. Lower number = wins. Escalation/de-escalation is
+# split first (see _event_sort_key); this orders within each side.
+KIND_PRIORITY = {
+    "war_declared": 0,
+    "started_attacking": 1,
+    "sustained_offensive": 2,
+    "at_war": 3,            # ongoing-war reminder: shown only if no fresher event
+    "arming_up": 4,
+    "rebuild_war": 5,
+    "war_ended": 0,
+    "went_quiet": 1,
+    "easing_off": 2,
+    "rebuild_eco": 3,
+}
 
 
 # ---------- API ----------
@@ -245,12 +278,13 @@ def fetch_country_detail(country_id):
         return v.get("value"), v.get("rank")
 
     weekly_damage, weekly_rank = _rank_val("weeklyCountryDamages")
-    _, total_rank = _rank_val("countryDamages")
+    total_damage, total_rank = _rank_val("countryDamages")
     active_pop, _ = _rank_val("countryActivePopulation")
 
     return {
         "weekly_damage": weekly_damage,
         "weekly_damage_rank": weekly_rank,
+        "total_damage": total_damage,     # cumulative all-time; never resets
         "total_damage_rank": total_rank,
         "active_pop": active_pop,
         "wars_with": sorted(
@@ -776,22 +810,49 @@ def detect_war_changes(prev_wars, current_wars):
     return sorted(cur - prev), sorted(prev - cur)
 
 
-def classify_damage_phase(prev_country, weekly_damage, now):
-    """Two-phase ("attacking"/"quiet") state machine over weekly damage dealt.
+def _damage_rate(history, current_total, now):
+    """Damage dealt per DAY, smoothed over ~RATE_WINDOW_HOURS, from cumulative
+    all-time damage (`countryDamages`, which never resets — unlike the weekly
+    accumulator). Returns None until there's a usable past data point.
+
+    Using a rate, not the weekly accumulator, is what makes "is it fighting
+    *now*" accurate: the raw weekly figure just grows all week regardless of
+    current activity.
+    """
+    if current_total is None:
+        return None
+    pts = [h for h in history
+           if h.get("total_damage") is not None and h.get("ts")]
+    if not pts:
+        return None
+    # Prefer a point ~24h back for smoothing; fall back to the oldest we have.
+    target = now - timedelta(hours=RATE_WINDOW_HOURS)
+    past = min(pts, key=lambda h: abs(parse_iso(h["ts"]) - target))
+    hours = (now - parse_iso(past["ts"])).total_seconds() / 3600
+    if hours < 1:
+        return None
+    delta = max(0.0, current_total - past["total_damage"])
+    return delta / hours * 24
+
+
+def classify_damage_phase(prev_country, total_damage, now):
+    """Two-phase ("attacking"/"quiet") state machine over the damage RATE.
 
     Returns (events, fields) where `events` is a list of event dicts to flag
     this run and `fields` is the phase state to persist. Hysteresis between
-    DAMAGE_ACTIVE and DAMAGE_QUIET stops a country hovering near one threshold
-    from flapping. On first sighting (no prior phase) we initialise silently so
-    a country already mid-offensive isn't reported as "just started".
+    DAMAGE_ACTIVE_RATE and DAMAGE_QUIET_RATE stops a country hovering near one
+    threshold from flapping. On first sighting (no prior phase) we initialise
+    silently so a country already mid-offensive isn't reported as "just
+    started"; the daily at-war reminder covers ongoing wars regardless.
     """
     prev_phase = prev_country.get("damage_phase")
     since = prev_country.get("damage_phase_since")
     sustained_reported = bool(prev_country.get("sustained_reported"))
     events = []
 
-    if weekly_damage is None:
-        # No data this run: carry phase forward untouched.
+    rate = _damage_rate(prev_country.get("history", []), total_damage, now)
+    if rate is None:
+        # Not enough history to know the rate yet: carry phase, emit nothing.
         return events, {
             "damage_phase": prev_phase,
             "damage_phase_since": since,
@@ -800,28 +861,28 @@ def classify_damage_phase(prev_country, weekly_damage, now):
 
     phase = prev_phase
     if prev_phase is None:
-        phase = "attacking" if weekly_damage >= DAMAGE_ACTIVE else "quiet"
+        phase = "attacking" if rate >= DAMAGE_ACTIVE_RATE else "quiet"
         since = now.isoformat()
         sustained_reported = False
-    elif prev_phase == "quiet" and weekly_damage >= DAMAGE_ACTIVE:
+    elif prev_phase == "quiet" and rate >= DAMAGE_ACTIVE_RATE:
         phase = "attacking"
         since = now.isoformat()
         sustained_reported = False
         events.append({"kind": "started_attacking", "severity": "high",
-                       "detection": {"weekly_damage": weekly_damage}})
-    elif prev_phase == "attacking" and weekly_damage < DAMAGE_QUIET:
+                       "detection": {"rate": rate}})
+    elif prev_phase == "attacking" and rate <= DAMAGE_QUIET_RATE:
         phase = "quiet"
         since = now.isoformat()
         sustained_reported = False
         events.append({"kind": "went_quiet", "severity": "med",
-                       "detection": {"weekly_damage": weekly_damage}})
+                       "detection": {"rate": rate}})
 
     if phase == "attacking" and not sustained_reported and since:
         since_dt = parse_iso(since)
         days = (now - since_dt).days if since_dt else 0
         if days >= SUSTAINED_DAYS:
             events.append({"kind": "sustained_offensive", "severity": "high",
-                           "detection": {"days": days, "weekly_damage": weekly_damage}})
+                           "detection": {"days": days, "rate": rate}})
             sustained_reported = True
 
     return events, {
@@ -904,6 +965,27 @@ def migrate(state):
         state["version"] = 9
         print("Migrated state v8 -> v9 (added damage-phase tracking).")
 
+    if version < 10:
+        for country in state.get("countries", {}).values():
+            country.setdefault("last_war_reminder_date", None)
+        state["version"] = 10
+        print("Migrated state v9 -> v10 (added daily at-war reminder tracking).")
+
+    if version < 11:
+        for country in state.get("countries", {}).values():
+            # Cumulative all-time damage, for the rate-based phase detector.
+            # Populated from the next detail fetch; rate needs ~a day of history.
+            country.setdefault("total_damage", None)
+            # Reset phase: the old phases were set by the weekly-accumulator
+            # logic (since replaced by damage rate), so clear them to re-init
+            # cleanly and avoid spurious transitions as the rate metric takes
+            # over. Ongoing wars stay visible via the daily at-war reminder.
+            country["damage_phase"] = None
+            country["damage_phase_since"] = None
+            country["sustained_reported"] = False
+        state["version"] = 11
+        print("Migrated state v10 -> v11 (cumulative-damage tracking; phase reset).")
+
     return state
 
 
@@ -945,6 +1027,12 @@ def _event_text(flag):
         if d.get("against_ireland"):
             return f"**{name}** declared war on Ireland"
         return f"**{name}** declared war on {', '.join(d.get('new_war_names', []))}"
+    if kind == "at_war":
+        rank = d.get("rank")
+        where = f" (#{rank} in the game for damage)" if rank else ""
+        if d.get("attacking"):
+            return f"**{name}** is at war with Ireland and attacking hard{where}"
+        return f"**{name}** is at war with Ireland (no major attacks right now)"
     if kind == "war_ended":
         return f"**{name}** ended its war with {', '.join(d.get('ended_war_names', []))}"
     if kind == "started_attacking":
@@ -974,7 +1062,8 @@ def _event_text(flag):
 def _event_sort_key(flag):
     deesc = 1 if flag["kind"] in DEMOB_KINDS else 0
     sev = {"high": 0, "med": 1, "low": 2}.get(flag["severity"], 3)
-    return (deesc, sev, flag["name"])
+    kind = KIND_PRIORITY.get(flag["kind"], 9)
+    return (deesc, sev, kind, flag["name"])
 
 
 def send_digest(flagged, stood_down, now):
@@ -1241,6 +1330,8 @@ def classify_post_flag_state(cid, prev_country, snap, active_war_ids):
 
 def main():
     now = datetime.now(timezone.utc)
+    now_local = now.astimezone(IRELAND_TZ)
+    today_local = now_local.strftime("%Y-%m-%d")
     state = load_state()
     state = migrate(state)
 
@@ -1355,6 +1446,7 @@ def main():
 
         detail = snap.get("detail") or {}
         weekly_damage = detail.get("weekly_damage")
+        total_damage = detail.get("total_damage")
         current_wars = detail.get("wars_with")
 
         burst = detect_reset_burst(history, snap["new_resets"])
@@ -1373,7 +1465,7 @@ def main():
         if current_wars is not None:
             new_wars, ended_wars = detect_war_changes(prev_wars, current_wars)
         damage_events, phase_fields = classify_damage_phase(
-            prev_country, weekly_damage, now
+            prev_country, total_damage, now
         )
 
         new_history = (history + [{
@@ -1384,6 +1476,7 @@ def main():
             "combat_ratio": snap["combat_ratio"],
             "resetter_combat_ratio": snap.get("resetter_combat_ratio"),
             "weekly_damage": weekly_damage,
+            "total_damage": total_damage,
         }])[-HISTORY_LEN:]
 
         new_country = {
@@ -1399,9 +1492,11 @@ def main():
             "last_discovery": snap.get("last_discovery"),
             "last_flagged_at": prev_country.get("last_flagged_at"),
             "last_flagged_peak_ratio": prev_country.get("last_flagged_peak_ratio"),
+            "last_war_reminder_date": prev_country.get("last_war_reminder_date"),
             "wars_with": current_wars if current_wars is not None else prev_wars,
             "weekly_damage": weekly_damage,
             "weekly_damage_rank": detail.get("weekly_damage_rank"),
+            "total_damage": total_damage,
             "total_damage_rank": detail.get("total_damage_rank"),
             "active_pop": detail.get("active_pop"),
             "damage_phase": phase_fields["damage_phase"],
@@ -1447,17 +1542,20 @@ def main():
             })
             flagged_this_run = True
 
-        # War-vs-economy build shift. Easing-off is suppressed while the country
-        # is actively at war with Ireland — a build dip isn't de-escalation when
-        # shells are still flying.
-        if creep:
+        # Build-shift and rebuild signals are SUPPRESSED for countries already at
+        # war with Ireland: when you're at war, your players shifting toward (or
+        # away from) combat is completely expected, not news. The ongoing war
+        # itself is surfaced by the daily at-war reminder below.
+        at_war_ireland = cid in active_war_ids
+
+        if creep and not at_war_ireland:
             sev = {"red": "high", "orange": "med", "yellow": "low"}[creep["tier"]]
             flagged.append({
                 "cid": cid, "name": snap["name"], "kind": "arming_up",
                 "severity": sev, "snap": snap, "detection": creep,
             })
             flagged_this_run = True
-        if collapse and cid not in active_war_ids:
+        if collapse and not at_war_ireland:
             sev = {"green_strong": "med", "green_med": "med",
                    "green_light": "low"}[collapse["tier"]]
             flagged.append({
@@ -1466,11 +1564,9 @@ def main():
             })
             flagged_this_run = True
 
-        # Skill-reset clusters = "rebuilding for war/economy". Skipped when the
-        # country is already saturated in that direction (routine reinforcement,
-        # not a fresh move).
         combat_cluster = (burst and burst_dir == "combat") or combat_intent
-        if combat_cluster and snap["combat_ratio"] < COMBAT_INTENT_SATURATED:
+        if (combat_cluster and not at_war_ireland
+                and snap["combat_ratio"] < COMBAT_INTENT_SATURATED):
             n = (burst["current"] if (burst and burst_dir == "combat")
                  else combat_intent["combat_resets"])
             flagged.append({
@@ -1480,7 +1576,7 @@ def main():
             })
             flagged_this_run = True
         eco_cluster = (burst and burst_dir == "eco") or eco_intent
-        if (eco_cluster and cid not in active_war_ids
+        if (eco_cluster and not at_war_ireland
                 and snap["combat_ratio"] > ECO_INTENT_SATURATED):
             n = (burst["current"] if (burst and burst_dir == "eco")
                  else eco_intent["eco_resets"])
@@ -1490,6 +1586,28 @@ def main():
                 "detection": {"n": n, "rcr": snap.get("resetter_combat_ratio")},
             })
             flagged_this_run = True
+
+        # Ongoing war with Ireland: a once-a-day reminder so a war that predates
+        # our tracking (no "declared war" / "started attacking" transition to
+        # report) stays visible, without re-posting every 3-hour run. A fresher
+        # war/attack event the same run out-ranks this in the per-run update.
+        if at_war_ireland and prev_country.get("last_war_reminder_date") != today_local:
+            phase = phase_fields.get("damage_phase")
+            if phase is not None:
+                attacking = phase == "attacking"
+            else:
+                # Bootstrap window (rate not computable yet): fall back to a high
+                # weekly-damage rank as the "are they fighting" proxy.
+                rank = detail.get("weekly_damage_rank")
+                attacking = bool(rank and rank <= WEEKLY_DAMAGE_HIGH_RANK)
+            flagged.append({
+                "cid": cid, "name": snap["name"], "kind": "at_war",
+                "severity": "high", "snap": snap,
+                "detection": {"rank": detail.get("weekly_damage_rank"),
+                              "attacking": attacking},
+            })
+            flagged_this_run = True
+            new_country["last_war_reminder_date"] = today_local
 
         # ---- Track peak ratio while flagged for the stand-down detector ----
         if flagged_this_run:
@@ -1555,18 +1673,16 @@ def main():
             # holding no longer triggers the per-run update.
             current_flagged_ids.add(cid)
 
-    # ---- Posture overview: once per UTC day, on the first run at or after
-    # 20:00 (8pm UTC; the workflow has a dedicated 20:00 cron so it fires then,
-    # not at the next 3-hourly slot). Tracked by date so a manual
+    # ---- Posture overview: once a day at 8pm Ireland local time, on the first
+    # run at or after 20:00 Dublin local (fed by the 19:00 + 20:00 UTC crons so
+    # one lands at 8pm in both IST and GMT). Tracked by *local* date so a manual
     # workflow_dispatch can't double-post, and only recorded if the post
-    # succeeds so a failed webhook retries next run. Carries the daily
-    # "all quiet" heartbeat. ----
-    today = now.strftime("%Y-%m-%d")
-    if now.hour >= 20 and state.get("last_posture_date") != today:
+    # succeeds so a failed webhook retries next run. ----
+    if now_local.hour >= POSTURE_LOCAL_HOUR and state.get("last_posture_date") != today_local:
         if send_posture_digest(snapshots, state, active_war_ids, country_name,
                                watchlist, holding, flagged, stood_down, now,
                                details=details):
-            state["last_posture_date"] = today
+            state["last_posture_date"] = today_local
 
     # Per-run update posts only on fresh flags or stand-downs, never on
     # holding alone.

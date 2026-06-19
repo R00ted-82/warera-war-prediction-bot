@@ -30,13 +30,13 @@ Red is always danger to Ireland. Green is always reassurance. Yellow and orange 
 
 Every signal is reported as **one short line** in the per-run update (icon + country + a few words). A single country can trip several in one run; the update collapses each country to its single most important line. Damage-based signals are the accurate core; skill-build signals are a *leading* indicator that lags real fighting.
 
-The primary signal is **weekly damage dealt** (`weeklyCountryDamages`, a rolling 7-day total with a game-wide rank). Each country is modelled as in one of two phases — *attacking* or *quiet* — with hysteresis between two thresholds (`DAMAGE_ACTIVE` / `DAMAGE_QUIET`) so it can't flap, and the transitions are what get reported:
+The primary signal is the **rate of damage dealt**. Note the metric subtlety: the game's `weeklyCountryDamages` field is a weekly *accumulator* — it grows from ~0 at the weekly reset to hundreds of millions, then resets — so its raw value mostly tells you how far into the week it is, not whether a country is fighting *now*. Instead the bot tracks the **increase in cumulative all-time damage** (`countryDamages`, which never resets) over a ~24h smoothing window, as damage/day. Each country is modelled as in one of two phases — *attacking* or *quiet* — with hysteresis between two rate thresholds (`DAMAGE_ACTIVE_RATE` / `DAMAGE_QUIET_RATE`, ~20M / ~8M per day) so it can't flap, and the transitions are what get reported:
 
-**🔴 Started attacking.** Weekly damage crossed from quiet up into the attacking band — a country that wasn't fighting now is. The earliest concrete "war started" signal.
+**🔴 Started attacking.** The damage rate climbed from quiet into the attacking band — a country that wasn't fighting now is. The earliest concrete "war started" signal.
 
 **🔴 Sustained offensive.** A country has stayed in the attacking band for `SUSTAINED_DAYS` (default 4) running — not a one-off skirmish but an ongoing campaign. Fired once per offensive.
 
-**🟢 Went quiet.** Weekly damage fell back below the quiet threshold after a spell of attacking — the fighting has dropped off.
+**🟢 Went quiet.** The damage rate fell back below the quiet threshold after a spell of attacking — the fighting has dropped off.
 
 **🟠 Arming up / 🟢 Easing off.** The country's war-vs-economy skill build shifted significantly (combat focus up = arming, down = easing). Easing-off is suppressed while Ireland is actively at war with the country — a build dip isn't de-escalation when shells are still flying.
 
@@ -192,7 +192,7 @@ If the larger 50-player sample plus the higher reset floors make alerts feel too
 
 `war_state.json` lives in the repo and is auto-committed every run. Holds per-country aggregate snapshots with rolling history, cached player IDs for fast next-run sampling, cooldown timestamps for each alert type, the peak combat ratio recorded while a country was flagged (for the stand-down vs holding decision), and the date of the last posture overview. Stays well under 1MB.
 
-The state file is migrated automatically on first run after a schema change. Current version is v9, which added per-country damage-phase tracking (`damage_phase`, `damage_phase_since`, `sustained_reported`) on top of v8's military-activity fields (`wars_with`, `weekly_damage`, `weekly_damage_rank`, `total_damage_rank`, `active_pop`). Migrations are idempotent.
+The state file is migrated automatically on first run after a schema change. Current version is v11, which added cumulative-damage tracking (`total_damage`) for the rate-based phase detector, a daily at-war reminder (`last_war_reminder_date`, v10), and damage-phase tracking (`damage_phase`, `damage_phase_since`, `sustained_reported`, v9), on top of v8's military-activity fields (`wars_with`, `weekly_damage`, `weekly_damage_rank`, `total_damage_rank`, `active_pop`). Migrations are idempotent.
 
 Delete `war_state.json` to reset baselines. The first ~5 runs after that will rely on the absolute floor only. Note that when a country re-enters the watchlist after being absent (for example after an occupation ends, or after the watchlist was broken), its first run re-counts every rebuild since it was last sampled as "new," which can briefly look noisy until the next run refreshes its baseline.
 
@@ -207,6 +207,10 @@ The workflow has a concurrency group, so two runs can't race on the state file.
 Two things confirm the bot is alive. The daily posture report opens with an "all quiet" line on calm days, so a healthy run is visible once a day even when nothing fires. And a staleness watchdog at the start of each run compares against the previous `last_run`: if it's older than `STALE_RUN_HOURS` (default 9, about three missed 3-hour runs), it posts a degraded-health alert and then proceeds normally. Lower `STALE_RUN_HOURS` toward 6-7 to catch a single missed run. The watchdog can only fire on a run that actually executes, so it flags a gap once runs resume rather than the instant the scheduler dies; true dead-man coverage would need an external pinger.
 
 ## Known gaps
+
+**Damage isn't attributed to a target.** The damage rate measures combat output *against anyone*, not specifically against Ireland. For a country already at war with Ireland this is clearly relevant (it's the at-war reminder's "attacking hard"), but a damage surge in a country **not** at war with Ireland could be it fighting a neighbour, not prepping for us. Per-war / per-target damage would need a separate battles endpoint.
+
+**Build % is a sampled estimate, not the whole population.** The combat-vs-economy "build" label is the median of a country's top ~50 most-active high-level players, so it's a hint at intent, not a census. (The damage signals, by contrast, are the game's own country-wide totals — no sampling.) Auditing every citizen wouldn't help: the population median collapses toward "economy" and it's ~7× the API load.
 
 **State-owned ammo production** isn't detected. Countries that stockpile through their own companies without player retraining will fly under the radar. Would need a separate watcher on `transaction.getPaginatedTransactions`.
 
