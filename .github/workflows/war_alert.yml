@@ -2,12 +2,12 @@ name: War preparation alert
 
 on:
   schedule:
-    - cron: '0 */3 * * *'   # every 3 hours (event monitoring)
+    #- cron: '0 */3 * * *'   # every 3 hours (event monitoring)
     # Daily posture report fires at 8pm Ireland local, year-round. The code
     # gates on Dublin local time; these two runs cover both offsets —
     # 19:00 UTC = 8pm IST (summer), 20:00 UTC = 8pm GMT (winter).
-    - cron: '0 19 * * *'
-    - cron: '0 20 * * *'
+    #- cron: '0 19 * * *'
+    #- cron: '0 20 * * *'
   workflow_dispatch:
 
 # Prevents two runs from racing on war_state.json if a scheduled run
