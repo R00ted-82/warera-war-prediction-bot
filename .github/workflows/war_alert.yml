@@ -1,0 +1,41 @@
+name: war-alert
+# Watches countries near Ireland every 3 hours for war mobilisation signals,
+# posts alerts to Discord, and commits the refreshed war_state.json back so
+# the next run has a baseline to diff. Runs an extra 19:00 + 20:00 UTC slot
+# so the daily posture report can land at 8pm Ireland time in both IST and GMT.
+on:
+  schedule:
+    - cron: "0 */3 * * *"      # every 3 hours, on the hour (UTC)
+    - cron: "0 19,20 * * *"    # extra slots for the daily posture report
+  workflow_dispatch:            # allow manual runs from the Actions tab
+permissions:
+  contents: write               # needed to push the updated state back
+# Never let two alert runs overlap: the commit-back would race.
+concurrency:
+  group: war-alert
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run alert
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.WAR_DISCORD_WEBHOOK_URL }}
+        run: python war_alert.py
+      - name: Commit refreshed state
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add war_state.json memory/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no state changes to commit"
+          else
+            git commit -m "chore: update war state [skip ci]"
+            git push
+          fi
