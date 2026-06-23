@@ -49,7 +49,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 WEBHOOK_URL = os.environ["WAR_DISCORD_WEBHOOK_URL"]
-API_BASE = "https://warera-proxy.Rooted82.workers.dev/trpc"
+API_BASE = "https://warera-proxy.R00ted82.workers.dev/trpc"
 STATE_FILE = Path("war_state.json")
 STATE_VERSION = 11
 
