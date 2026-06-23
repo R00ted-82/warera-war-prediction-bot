@@ -222,4 +222,4 @@ Two things confirm the bot is alive. The daily posture report opens with an "all
 
 ## Credits
 
-Data via the [warera-proxy](https://warera-proxy.toie.workers.dev/) gateway and [warerastats.io](https://warerastats.io/). Made by toie.
+Data via the [warera-proxy](https://warera-proxy.Rooted82.workers.dev/) gateway and [warerastats.io](https://warerastats.io/). Made by toie.
