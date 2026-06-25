@@ -5,8 +5,8 @@ name: war-alert
 # so the daily posture report can land at 8pm Ireland time in both IST and GMT.
 on:
   schedule:
-    - cron: "0 */3 * * *"      # every 3 hours, on the hour (UTC)
-    - cron: "0 19,20 * * *"    # extra slots for the daily posture report
+    - cron: "17 */3 * * *"     # every 3 hours at :17 past (UTC) — off the hour to dodge GitHub's congested top-of-hour queue
+    - cron: "17 19,20 * * *"   # extra slots for the daily posture report
   workflow_dispatch:            # allow manual runs from the Actions tab
 permissions:
   contents: write               # needed to push the updated state back
